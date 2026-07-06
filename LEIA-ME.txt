@@ -1,0 +1,38 @@
+================================================================
+CARGOTECH — Sistema de Cotações de Seguro de Transporte
+================================================================
+
+PRIMEIRO USO — siga essa ordem:
+
+1. INSTALE O NODE.JS
+   → https://nodejs.org (baixe a versão LTS)
+
+2. ABRA A PASTA NO VS CODE
+   → Arraste a pasta "cargotech" para o ícone do VS Code
+   → Ou: Arquivo → Abrir Pasta → selecione "cargotech"
+
+3. ABRA O TERMINAL NO VS CODE
+   → Menu: Terminal → Novo Terminal
+
+4. INSTALE AS DEPENDÊNCIAS
+   → No terminal, digite:
+      npm install
+   → Aguarde terminar (pode demorar 1-2 minutos)
+
+5. CONFIGURE AS VARIÁVEIS DE AMBIENTE
+   → Copie o arquivo ".env.local.example" 
+   → Renomeie a cópia para ".env.local"
+   → Abra o ".env.local" e preencha com suas credenciais do Supabase:
+      (Supabase → Project Settings → API)
+
+6. RODE O PROJETO
+   → No terminal:
+      npm run dev
+   → Acesse: http://localhost:3000
+
+================================================================
+CREDENCIAIS DO SUPABASE (onde encontrar):
+   Project URL      → Project Settings → API → Project URL
+   anon key         → Project Settings → API → anon / public
+   service_role key → Project Settings → API → service_role / secret
+================================================================
