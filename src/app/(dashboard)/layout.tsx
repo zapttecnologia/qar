@@ -123,22 +123,28 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
 
       {/* Rodapé */}
       <div style={{ padding: '10px 10px 14px', borderTop: '1px solid var(--sidebar-border)' }}>
-        <Link href="/admin" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, textDecoration: 'none', color: 'rgba(167,139,250,.7)', fontSize: 12, marginBottom: 4 }}
+        <Link href="/admin" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, textDecoration: 'none', color: 'rgba(167,139,250,.7)', fontSize: 12, marginBottom: 2 }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(167,139,250,.1)' }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
           <i className="ti ti-shield" style={{ fontSize: 14 }} aria-hidden="true" />
           Painel admin
         </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 6, cursor: 'pointer' }}
-          onClick={() => sair().then(() => router.push('/auth/login'))}
+        <Link href="/perfil" style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 6, textDecoration: 'none', cursor: 'pointer', marginBottom: 2 }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--sidebar-hover)' }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
           <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: '#fff', flexShrink: 0 }}>{iniciais}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ color: '#fff', fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{usuario?.nome ?? '—'}</div>
-            <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 10 }}>Sair</div>
+            <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 10 }}>Meu perfil</div>
           </div>
-          <i className="ti ti-logout" style={{ color: 'rgba(255,255,255,.3)', fontSize: 14, flexShrink: 0 }} aria-hidden="true" />
+          <i className="ti ti-chevron-right" style={{ color: 'rgba(255,255,255,.2)', fontSize: 13, flexShrink: 0 }} aria-hidden="true" />
+        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 10px', borderRadius: 6, cursor: 'pointer' }}
+          onClick={() => sair().then(() => router.push('/auth/login'))}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--sidebar-hover)' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
+          <i className="ti ti-logout" style={{ color: 'rgba(255,255,255,.35)', fontSize: 15, flexShrink: 0 }} aria-hidden="true" />
+          <span style={{ color: 'rgba(255,255,255,.35)', fontSize: 12 }}>Sair</span>
         </div>
       </div>
     </aside>
