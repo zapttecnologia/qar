@@ -20,7 +20,14 @@ export default function LoginPage() {
       setCarregando(false)
       return
     }
-    window.location.href = '/dashboard'
+    // Verifica se é super admin — redireciona para /admin
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    const { data: sa } = await supabase.from('super_admins').select('id').eq('usuario_id', currentUser?.id ?? '').single()
+    if (sa) {
+      window.location.href = '/admin'
+    } else {
+      window.location.href = '/dashboard'
+    }
   }
 
   return (

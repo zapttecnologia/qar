@@ -15,18 +15,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Todos os campos são obrigatórios.' }, { status: 400 })
     }
 
-    // Verifica se quem está criando é admin da corretora
-    const { data: membro } = await supabase
-      .from('membros')
-      .select('papel')
-      .eq('corretora_id', corretora_id)
+    // Verifica se quem está criando é super admin OU admin da corretora
+    const { data: superAdmin } = await supabase
+      .from('super_admins')
+      .select('id')
       .eq('usuario_id', user.id)
-      .eq('convite_aceito', true)
       .single()
 
-    const m = membro as { papel: string } | null
-    if (!m || m.papel !== 'admin') {
-      return NextResponse.json({ error: 'Apenas administradores podem criar usuários.' }, { status: 403 })
+    if (!superAdmin) {
+      // Não é super admin — verifica se é admin da corretora
+      const { data: membro } = await supabase
+        .from('membros')
+        .select('papel')
+        .eq('corretora_id', corretora_id)
+        .eq('usuario_id', user.id)
+        .eq('convite_aceito', true)
+        .single()
+
+      const m = membro as { papel: string } | null
+      if (!m || m.papel !== 'admin') {
+        return NextResponse.json({ error: 'Apenas administradores podem criar usuários.' }, { status: 403 })
+      }
     }
 
     // Verifica limite de usuários do plano

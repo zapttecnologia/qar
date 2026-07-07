@@ -18,7 +18,7 @@ const NAV = [
 function DashboardInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { usuario, corretora, corretoras, trocarCorretora, sair, carregando } = useSessao()
+  const { usuario, corretora, corretoras, trocarCorretora, sair, carregando, isSuperAdmin } = useSessao()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
 
@@ -150,6 +150,13 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
     '/equipe': 'Equipe', '/configuracoes': 'Configurações',
   }
   const pageTitle = Object.entries(PAGE_TITLES).find(([k]) => pathname.startsWith(k))?.[1] ?? 'Cargotech'
+
+  // Super admin sem corretora → redireciona para /admin
+  useEffect(() => {
+    if (!carregando && isSuperAdmin && !corretora && corretoras.length === 0) {
+      router.replace('/admin')
+    }
+  }, [carregando, isSuperAdmin, corretora, corretoras])
 
   if (carregando) return (
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-page)' }}>
