@@ -4,159 +4,125 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Building2, FileText, Users, TrendingUp, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
 
-interface Metricas {
-  total_corretoras: number
-  corretoras_ativas: number
-  corretoras_trial: number
-  corretoras_bloqueadas: number
-  total_cotacoes: number
-  cotacoes_mes: number
-  total_usuarios: number
+interface Corretora {
+  id: string; nome: string; plano_assinatura: string; status_assinatura: string
+  bloqueada: boolean; total_cotacoes: number; cotacoes_mes_atual: number; criado_em: string
 }
 
-interface CorretoraRecente {
-  id: string
-  nome: string
-  plano_assinatura: string
-  status_assinatura: string
-  bloqueada: boolean
-  total_cotacoes: number
-  cotacoes_mes_atual: number
-  criado_em: string
-  ultima_cotacao_em: string | null
+const PLANO_CORES: Record<string, { bg: string; text: string }> = {
+  trial:        { bg: '#21262d', text: '#8b949e' },
+  basico:       { bg: '#0d1f3c', text: '#58a6ff' },
+  profissional: { bg: '#1a0f3c', text: '#a78bfa' },
+  enterprise:   { bg: '#2d1a00', text: '#f59e0b' },
 }
 
 export default function AdminPage() {
   const supabase = createClient()
-  const [metricas, setMetricas] = useState<Metricas | null>(null)
-  const [corretoras, setCorretoras] = useState<CorretoraRecente[]>([])
+  const [corretoras, setCorretoras] = useState<Corretora[]>([])
   const [carregando, setCarregando] = useState(true)
 
   useEffect(() => {
-    async function carregar() {
-      const { data: view } = await supabase
-        .from('vw_metricas_corretoras')
-        .select('*')
-        .order('criado_em', { ascending: false })
-
-      const lista = (view ?? []) as CorretoraRecente[]
-      setCorretoras(lista.slice(0, 8))
-
-      setMetricas({
-        total_corretoras: lista.length,
-        corretoras_ativas: lista.filter(c => c.status_assinatura === 'ativa' && !c.bloqueada).length,
-        corretoras_trial: lista.filter(c => c.plano_assinatura === 'trial').length,
-        corretoras_bloqueadas: lista.filter(c => c.bloqueada).length,
-        total_cotacoes: lista.reduce((s, c) => s + (c.total_cotacoes ?? 0), 0),
-        cotacoes_mes: lista.reduce((s, c) => s + (c.cotacoes_mes_atual ?? 0), 0),
-        total_usuarios: 0,
-      })
-      setCarregando(false)
-    }
-    carregar()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(supabase as any).from('vw_metricas_corretoras').select('*').order('criado_em', { ascending: false })
+      .then(({ data }: { data: Corretora[] }) => { setCorretoras(data ?? []); setCarregando(false) })
   }, [])
 
-  const PLANO_COR: Record<string, string> = {
-    trial: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-    basico: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    profissional: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-    enterprise: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  }
+  const ativas   = corretoras.filter(c => c.status_assinatura === 'ativa' && !c.bloqueada).length
+  const trial    = corretoras.filter(c => c.plano_assinatura === 'trial').length
+  const total_cot = corretoras.reduce((s, c) => s + (c.total_cotacoes ?? 0), 0)
+  const mes_cot  = corretoras.reduce((s, c) => s + (c.cotacoes_mes_atual ?? 0), 0)
+  const bloqueadas = corretoras.filter(c => c.bloqueada).length
+
+  const card = (label: string, value: number | string, icon: string, cor: string) => (
+    <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 10, padding: '14px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <i className={`ti ${icon}`} style={{ fontSize: 16, color: cor }} aria-hidden="true" />
+        <span style={{ fontSize: 11, color: '#8b949e', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px' }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 600, color: '#e6edf3' }}>{value}</div>
+    </div>
+  )
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Visão geral</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Painel de gestão global do sistema</p>
+    <div style={{ padding: 20, maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 16, fontWeight: 600, color: '#e6edf3' }}>Visão geral</h1>
+        <p style={{ fontSize: 12, color: '#8b949e', marginTop: 4 }}>Painel de gestão global do sistema</p>
       </div>
 
       {/* Métricas */}
-      {carregando ? (
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 animate-pulse h-20" />
-          ))}
-        </div>
-      ) : metricas && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          {[
-            { label: 'Corretoras ativas', value: metricas.corretoras_ativas, icon: Building2, cor: 'text-blue-600' },
-            { label: 'Em trial', value: metricas.corretoras_trial, icon: TrendingUp, cor: 'text-amber-500' },
-            { label: 'Total de cotações', value: metricas.total_cotacoes, icon: FileText, cor: 'text-green-600' },
-            { label: 'Cotações este mês', value: metricas.cotacoes_mes, icon: TrendingUp, cor: 'text-purple-600' },
-          ].map(m => (
-            <div key={m.label} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <m.icon className={`w-4 h-4 ${m.cor}`} />
-                <p className="text-xs text-gray-500">{m.label}</p>
-              </div>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{m.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
+        {card('Corretoras ativas', ativas, 'ti-building', '#58a6ff')}
+        {card('Em trial', trial, 'ti-clock', '#f59e0b')}
+        {card('Total cotações', total_cot, 'ti-file-text', '#3fb950')}
+        {card('Cotações este mês', mes_cot, 'ti-chart-bar', '#a78bfa')}
+      </div>
 
-      {/* Alertas */}
-      {metricas && metricas.corretoras_bloqueadas > 0 && (
-        <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 mb-4">
-          <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
-          <p className="text-sm text-red-600 dark:text-red-400">
-            {metricas.corretoras_bloqueadas} corretora{metricas.corretoras_bloqueadas > 1 ? 's' : ''} bloqueada{metricas.corretoras_bloqueadas > 1 ? 's' : ''}.
-            <a href="/admin/corretoras" className="underline ml-1">Ver detalhes</a>
+      {/* Alerta de bloqueadas */}
+      {bloqueadas > 0 && (
+        <div style={{ background: '#2d0e0e', border: '1px solid #f85149', borderRadius: 8, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <i className="ti ti-alert-triangle" style={{ color: '#f85149', fontSize: 16, flexShrink: 0 }} aria-hidden="true" />
+          <p style={{ fontSize: 13, color: '#f85149' }}>
+            {bloqueadas} corretora{bloqueadas > 1 ? 's' : ''} bloqueada{bloqueadas > 1 ? 's' : ''}.{' '}
+            <Link href="/admin/corretoras" style={{ color: '#f85149', textDecoration: 'underline' }}>Ver detalhes</Link>
           </p>
         </div>
       )}
 
-      {/* Lista de corretoras */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 dark:border-gray-800">
-          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Corretoras recentes</h2>
-          <a href="/admin/corretoras" className="text-xs text-blue-600 hover:underline">Ver todas →</a>
+      {/* Tabela */}
+      <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #30363d' }}>
+          <h2 style={{ fontSize: 13, fontWeight: 600, color: '#e6edf3' }}>Corretoras recentes</h2>
+          <Link href="/admin/corretoras" style={{ fontSize: 12, color: '#58a6ff', textDecoration: 'none' }}>Ver todas →</Link>
         </div>
 
         {carregando ? (
-          <div className="p-8 text-center text-sm text-gray-400">Carregando...</div>
+          <div style={{ padding: 40, textAlign: 'center', fontSize: 13, color: '#8b949e' }}>Carregando...</div>
         ) : (
-          <table className="w-full text-sm">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr className="border-b border-gray-100 dark:border-gray-800">
+              <tr style={{ borderBottom: '1px solid #30363d' }}>
                 {['Corretora', 'Plano', 'Cotações', 'Este mês', 'Status', ''].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                  <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#8b949e', textTransform: 'uppercase', letterSpacing: '.4px', background: '#0d1117' }}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-              {corretoras.map(c => (
-                <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      {c.bloqueada && <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
-                      <span className="font-medium text-gray-900 dark:text-white">{c.nome}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-md font-medium capitalize ${PLANO_COR[c.plano_assinatura] ?? PLANO_COR.trial}`}>
-                      {c.plano_assinatura}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{c.total_cotacoes ?? 0}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{c.cotacoes_mes_atual ?? 0}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${
-                      c.bloqueada ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                        : c.status_assinatura === 'ativa' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {c.bloqueada ? 'Bloqueada' : c.status_assinatura}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <a href={`/admin/corretoras/${c.id}`} className="text-xs text-blue-600 hover:underline">Ver</a>
-                  </td>
-                </tr>
-              ))}
+            <tbody>
+              {corretoras.slice(0, 8).map(c => {
+                const plano = PLANO_CORES[c.plano_assinatura] ?? PLANO_CORES.trial
+                return (
+                  <tr key={c.id} style={{ borderBottom: '1px solid #21262d', cursor: 'pointer' }}
+                    onClick={() => window.location.href = `/admin/corretoras/${c.id}`}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#1c2330')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {c.bloqueada && <i className="ti ti-alert-triangle" style={{ color: '#f85149', fontSize: 14 }} aria-hidden="true" />}
+                        <span style={{ fontWeight: 500, color: '#e6edf3', fontSize: 13 }}>{c.nome}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{ background: plano.bg, color: plano.text, padding: '3px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500, textTransform: 'capitalize' }}>{c.plano_assinatura}</span>
+                    </td>
+                    <td style={{ padding: '12px 16px', color: '#8b949e', fontSize: 13 }}>{c.total_cotacoes ?? 0}</td>
+                    <td style={{ padding: '12px 16px', color: '#8b949e', fontSize: 13 }}>{c.cotacoes_mes_atual ?? 0}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{
+                        background: c.bloqueada ? '#2d0e0e' : c.status_assinatura === 'ativa' ? '#0d2b1a' : '#21262d',
+                        color: c.bloqueada ? '#f85149' : c.status_assinatura === 'ativa' ? '#3fb950' : '#8b949e',
+                        padding: '3px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500,
+                      }}>
+                        {c.bloqueada ? 'Bloqueada' : c.status_assinatura}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <Link href={`/admin/corretoras/${c.id}`} style={{ fontSize: 12, color: '#58a6ff', textDecoration: 'none' }} onClick={e => e.stopPropagation()}>Ver →</Link>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}

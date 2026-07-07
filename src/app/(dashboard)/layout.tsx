@@ -8,10 +8,11 @@ import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
 const NAV = [
-  { href: '/cotacoes', label: 'Cotações',      icon: 'ti-file-text' },
-  { href: '/clientes', label: 'Clientes',       icon: 'ti-building' },
-  { href: '/equipe',   label: 'Equipe',          icon: 'ti-users' },
-  { href: '/configuracoes', label: 'Configurações', icon: 'ti-settings' },
+  { href: '/dashboard',    label: 'Início',          icon: 'ti-home' },
+  { href: '/cotacoes',     label: 'Cotações',        icon: 'ti-file-text' },
+  { href: '/clientes',     label: 'Clientes',        icon: 'ti-building' },
+  { href: '/equipe',       label: 'Equipe',           icon: 'ti-users' },
+  { href: '/configuracoes', label: 'Configurações',  icon: 'ti-settings' },
 ]
 
 function DashboardInner({ children }: { children: React.ReactNode }) {
@@ -43,16 +44,18 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
       width: 'var(--sidebar-width)', background: 'var(--sidebar-bg)',
       display: 'flex', flexDirection: 'column', height: '100%', flexShrink: 0,
     }}>
-      {/* Logo */}
-      <div style={{ padding: '16px', borderBottom: '1px solid var(--sidebar-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 30, height: 30, background: 'var(--accent)', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <i className="ti ti-truck" style={{ color: '#fff', fontSize: 15 }} aria-hidden="true" />
+      {/* Logo QARtech — Variação 4 */}
+      <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--sidebar-border)' }}>
+        <div style={{ marginBottom: 3 }}>
+          <span style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', fontSize: 22, fontWeight: 700, color: '#ffffff', letterSpacing: -.5 }}>QAR</span>
+          <span style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', fontSize: 22, fontWeight: 300, color: '#58a5f0', letterSpacing: -.5 }}>tech</span>
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, lineHeight: 1.2 }}>Cargotech</div>
-          <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 10, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {corretora?.nome ?? 'Selecione...'}
-          </div>
+        <div style={{ position: 'relative', marginBottom: 5 }}>
+          <div style={{ height: 1.5, background: 'rgba(255,255,255,0.1)', borderRadius: 1 }} />
+          <div style={{ height: 1.5, background: '#58a5f0', borderRadius: 1, width: 34, position: 'absolute', top: 0, left: 0 }} />
+        </div>
+        <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {corretora?.nome ?? 'sistema de cotações'}
         </div>
       </div>
 
@@ -64,8 +67,8 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
             onChange={e => trocarCorretora(e.target.value)}
             style={{ width: '100%', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 5, color: 'rgba(255,255,255,.8)', fontSize: 12, padding: '5px 8px', outline: 'none', cursor: 'pointer' }}
           >
-            {corretoras.map(({ corretora: c }) => (
-              <option key={c.id} value={c.id} style={{ background: '#1a3a5c', color: '#fff' }}>{c.nome}</option>
+            {corretoras.map(({ corretora: c }, idx) => (
+              <option key={`${c.id}-${idx}`} value={c.id} style={{ background: '#1a3a5c', color: '#fff' }}>{c.nome}</option>
             ))}
           </select>
         </div>
@@ -74,7 +77,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
       {/* Nav principal */}
       <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
         <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--sidebar-section)', textTransform: 'uppercase', letterSpacing: '.7px', padding: '8px 8px 4px' }}>Principal</div>
-        {NAV.slice(0, 2).map(({ href, label, icon }) => {
+        {NAV.slice(0, 3).map(({ href, label, icon }) => {
           const active = pathname.startsWith(href)
           return (
             <Link key={href} href={href} onClick={() => setSidebarOpen(false)}
@@ -96,7 +99,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
         })}
 
         <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--sidebar-section)', textTransform: 'uppercase', letterSpacing: '.7px', padding: '14px 8px 4px' }}>Gestão</div>
-        {NAV.slice(2).map(({ href, label, icon }) => {
+        {NAV.slice(3).map(({ href, label, icon }) => {
           const active = pathname.startsWith(href)
           return (
             <Link key={href} href={href} onClick={() => setSidebarOpen(false)}
@@ -143,7 +146,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
 
   // Títulos das páginas
   const PAGE_TITLES: Record<string, string> = {
-    '/cotacoes': 'Cotações', '/clientes': 'Clientes',
+    '/dashboard': 'Início', '/cotacoes': 'Cotações', '/clientes': 'Clientes',
     '/equipe': 'Equipe', '/configuracoes': 'Configurações',
   }
   const pageTitle = Object.entries(PAGE_TITLES).find(([k]) => pathname.startsWith(k))?.[1] ?? 'Cargotech'

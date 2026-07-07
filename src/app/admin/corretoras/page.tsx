@@ -5,28 +5,20 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Search, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
 
 interface Corretora {
-  id: string
-  nome: string
-  cnpj: string | null
-  plano_assinatura: string
-  plano_valor: number | null
-  plano_vencimento: string | null
-  status_assinatura: string
-  bloqueada: boolean
-  total_cotacoes: number
-  total_membros: number
-  cotacoes_mes_atual: number
-  criado_em: string
+  id: string; nome: string; cnpj: string | null
+  plano_assinatura: string; plano_valor: number | null
+  status_assinatura: string; bloqueada: boolean
+  total_cotacoes: number; total_membros: number; cotacoes_mes_atual: number
 }
 
-const PLANO_COR: Record<string, string> = {
-  trial:        'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-  basico:       'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  profissional: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  enterprise:   'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+const PLANO_CORES: Record<string, { bg: string; text: string }> = {
+  trial:        { bg: '#21262d', text: '#8b949e' },
+  basico:       { bg: '#0d1f3c', text: '#58a6ff' },
+  profissional: { bg: '#1a0f3c', text: '#a78bfa' },
+  enterprise:   { bg: '#2d1a00', text: '#f59e0b' },
 }
 
 export default function AdminCorretorasPage() {
@@ -37,8 +29,9 @@ export default function AdminCorretorasPage() {
   const [busca, setBusca] = useState('')
 
   useEffect(() => {
-    supabase.from('vw_metricas_corretoras').select('*').order('criado_em', { ascending: false })
-      .then(({ data }) => { setCorretoras((data ?? []) as Corretora[]); setCarregando(false) })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(supabase as any).from('vw_metricas_corretoras').select('*').order('criado_em', { ascending: false })
+      .then(({ data }: { data: Corretora[] }) => { setCorretoras(data ?? []); setCarregando(false) })
   }, [])
 
   const filtradas = corretoras.filter(c =>
@@ -47,80 +40,81 @@ export default function AdminCorretorasPage() {
   )
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div style={{ padding: 20, maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Corretoras</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{corretoras.length} corretoras cadastradas</p>
+          <h1 style={{ fontSize: 16, fontWeight: 600, color: '#e6edf3' }}>Corretoras</h1>
+          <p style={{ fontSize: 12, color: '#8b949e', marginTop: 4 }}>{corretoras.length} corretoras cadastradas</p>
         </div>
-        <button
-          onClick={() => router.push('/admin/corretoras/nova')}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-500"
-        >
-          <Plus className="w-4 h-4" /> Nova corretora
-        </button>
+        <Link href="/admin/corretoras/nova"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: '#7c3aed', color: '#fff', borderRadius: 6, fontSize: 13, fontWeight: 500, textDecoration: 'none' }}>
+          <i className="ti ti-plus" style={{ fontSize: 14 }} aria-hidden="true" />
+          Nova corretora
+        </Link>
       </div>
 
       {/* Busca */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          value={busca}
-          onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar por nome ou CNPJ..."
-          className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900 dark:text-white"
-        />
+      <div style={{ position: 'relative', marginBottom: 14 }}>
+        <i className="ti ti-search" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: '#8b949e' }} aria-hidden="true" />
+        <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome ou CNPJ..."
+          style={{ width: '100%', paddingLeft: 34, paddingRight: 12, paddingTop: 8, paddingBottom: 8, background: '#161b22', border: '1px solid #30363d', borderRadius: 6, color: '#e6edf3', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
       </div>
 
       {/* Tabela */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 10, overflow: 'hidden' }}>
         {carregando ? (
-          <div className="p-8 text-center text-sm text-gray-400">Carregando...</div>
+          <div style={{ padding: 40, textAlign: 'center', fontSize: 13, color: '#8b949e' }}>Carregando...</div>
         ) : (
-          <table className="w-full text-sm">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr className="border-b border-gray-100 dark:border-gray-800">
-                {['Corretora','CNPJ','Plano','Valor/mês','Membros','Cotações','Status',''].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+              <tr style={{ borderBottom: '1px solid #30363d', background: '#0d1117' }}>
+                {['Corretora','CNPJ','Plano','Valor/mês','Membros','Cotações','Status'].map(h => (
+                  <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#8b949e', textTransform: 'uppercase', letterSpacing: '.4px' }}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-              {filtradas.map(c => (
-                <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
-                  onClick={() => router.push(`/admin/corretoras/${c.id}`)}>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      {c.bloqueada && <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
-                      <span className="font-medium text-gray-900 dark:text-white">{c.nome}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{c.cnpj ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-md font-medium capitalize ${PLANO_COR[c.plano_assinatura] ?? PLANO_COR.trial}`}>
-                      {c.plano_assinatura}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">
-                    {c.plano_valor ? `R$ ${Number(c.plano_valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{c.total_membros ?? 0}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{c.total_cotacoes ?? 0}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${
-                      c.bloqueada ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                        : c.status_assinatura === 'ativa' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        : c.status_assinatura === 'inadimplente' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                        : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {c.bloqueada ? 'Bloqueada' : c.status_assinatura}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-blue-600">Ver →</td>
-                </tr>
-              ))}
+            <tbody>
+              {filtradas.map(c => {
+                const plano = PLANO_CORES[c.plano_assinatura] ?? PLANO_CORES.trial
+                return (
+                  <tr key={c.id} style={{ borderBottom: '1px solid #21262d', cursor: 'pointer' }}
+                    onClick={() => router.push(`/admin/corretoras/${c.id}`)}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#1c2330')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {c.bloqueada && <i className="ti ti-alert-triangle" style={{ color: '#f85149', fontSize: 14 }} aria-hidden="true" />}
+                        <span style={{ fontWeight: 500, color: '#e6edf3', fontSize: 13 }}>{c.nome}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 16px', color: '#8b949e', fontSize: 12 }}>{c.cnpj ?? '—'}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{ background: plano.bg, color: plano.text, padding: '3px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500, textTransform: 'capitalize' }}>{c.plano_assinatura}</span>
+                    </td>
+                    <td style={{ padding: '12px 16px', color: '#8b949e', fontSize: 12 }}>
+                      {c.plano_valor ? `R$ ${Number(c.plano_valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}
+                    </td>
+                    <td style={{ padding: '12px 16px', color: '#8b949e', fontSize: 13 }}>{c.total_membros ?? 0}</td>
+                    <td style={{ padding: '12px 16px', color: '#8b949e', fontSize: 13 }}>{c.total_cotacoes ?? 0}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{
+                        background: c.bloqueada ? '#2d0e0e' : c.status_assinatura === 'ativa' ? '#0d2b1a' : '#21262d',
+                        color: c.bloqueada ? '#f85149' : c.status_assinatura === 'ativa' ? '#3fb950' : '#8b949e',
+                        padding: '3px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500,
+                      }}>
+                        {c.bloqueada ? 'Bloqueada' : c.status_assinatura}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
+        )}
+        {filtradas.length > 0 && (
+          <div style={{ padding: '10px 16px', borderTop: '1px solid #21262d', fontSize: 11, color: '#8b949e', textAlign: 'right' }}>
+            {filtradas.length} de {corretoras.length} corretoras
+          </div>
         )}
       </div>
     </div>

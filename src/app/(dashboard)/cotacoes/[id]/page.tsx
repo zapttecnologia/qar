@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Pencil, Check, X, Plus, Trash2, FileText } from 'lucide-react'
 import { useSessao, usePode } from '@/hooks/useSessao'
 import { buscarCotacao, atualizarCotacao, atualizarStatusCotacao, salvarMercadorias, salvarPercursos } from '@/lib/queries/cotacoes'
 import { statusConfig, formatBRL, formatCNPJ } from '@/lib/utils'
@@ -20,9 +19,9 @@ const STATUS_OPCOES: StatusCotacao[] = ['rascunho', 'em_analise', 'pendente_dado
 function Campo({ label, value }: { label: string; value?: string | number | null }) {
   if (!value && value !== 0) return null
   return (
-    <div className="py-2.5 border-b border-gray-50 dark:border-gray-800 last:border-0">
-      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-      <p className="text-sm text-gray-900 dark:text-white">{value}</p>
+    <div style={{ padding: "8px 0", borderBottom: "1px solid var(--border-color)" }}>
+      <p style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 2 }}>{label}</p>
+      <p style={{ fontSize: 13, color: "var(--text-1)" }}>{value}</p>
     </div>
   )
 }
@@ -37,23 +36,23 @@ function SecaoHeader({ titulo, editando, onEditar, onCancelar, onSalvar, salvand
   salvando: boolean
 }) {
   return (
-    <div className="flex items-center justify-between mb-3">
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{titulo}</h3>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+      <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>{titulo}</h3>
       {!editando ? (
-        <button onClick={onEditar} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700">
-          <Pencil className="w-3 h-3" /> Editar
+        <button onClick={onEditar} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--accent)", background: "none", border: "none", cursor: "pointer" }}>
+          <i className="ti ti-pencil" style={{ fontSize: 12 }} /> Editar
         </button>
       ) : (
-        <div className="flex gap-2">
+        <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={onSalvar}
             disabled={salvando}
-            className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 disabled:opacity-50"
+            style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#059669", background: "none", border: "none", cursor: "pointer" }}
           >
-            <Check className="w-3 h-3" /> {salvando ? 'Salvando...' : 'Salvar'}
+            <i className="ti ti-check" style={{ fontSize: 12 }} /> {salvando ? 'Salvando...' : 'Salvar'}
           </button>
-          <button onClick={onCancelar} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
-            <X className="w-3 h-3" /> Cancelar
+          <button onClick={onCancelar} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text-3)", background: "none", border: "none", cursor: "pointer" }}>
+            <i className="ti ti-x" style={{ fontSize: 12 }} /> Cancelar
           </button>
         </div>
       )}
@@ -73,7 +72,7 @@ function InputEdit({ label, value, onChange, type = 'text', full = false }: {
         type={type}
         value={value ?? ''}
         onChange={e => onChange(e.target.value)}
-        className="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="field-input" style={{ fontSize: 13 }}
       />
     </div>
   )
@@ -221,31 +220,31 @@ export default function CotacaoDetalhePage() {
   const historico = c.historico_cotacao as Array<Record<string, unknown>> ?? []
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div style={{ padding: 20, maxWidth: 960, margin: "0 auto" }}>
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-            <ArrowLeft className="w-4 h-4 text-gray-500" />
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={() => router.back()} style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid var(--border-color)", background: "var(--bg-card)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-2)" }}>
+            <i className="ti ti-arrow-left" style={{ fontSize: 15 }} />
           </button>
           <div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h1 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-1)" }}>
               {c.razao_social as string ?? c.cnpj as string}
             </h1>
-            <p className="text-sm text-gray-500">
+            <p style={{ fontSize: 12, color: "var(--text-3)" }}>
               {formatCNPJ(c.cnpj as string)} · {c.ramo as string}
             </p>
           </div>
         </div>
 
         {/* Status + ações */}
-        <div className="flex items-center gap-2">
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <select
             value={c.status as string}
             onChange={e => mudarStatus(e.target.value as StatusCotacao)}
             disabled={!pode}
-            className={`text-xs px-2.5 py-1.5 rounded-lg font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${status?.className}`}
+            className={`status-badge status-${c.status}`} style={{ cursor: "pointer", border: "none", outline: "none", fontSize: 12 }}
           >
             {STATUS_OPCOES.map(s => (
               <option key={s} value={s}>{statusConfig[s]?.label}</option>
@@ -254,12 +253,12 @@ export default function CotacaoDetalhePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
         {/* Coluna principal */}
-        <div className="col-span-2 space-y-4">
+        <div style={{ gridColumn: "1 / 3", display: "flex", flexDirection: "column", gap: 14 }}>
 
           {/* SEÇÃO 1: Dados cadastrais */}
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+          <div className="card" style={{ padding: 16 }}>
             <SecaoHeader
               titulo="Dados cadastrais"
               editando={editando === 'cadastro'}
@@ -270,7 +269,7 @@ export default function CotacaoDetalhePage() {
             />
 
             {editando === 'cadastro' ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <InputEdit label="CNPJ" value={d1.cnpj} onChange={v => setD1(p => ({ ...p, cnpj: v }))} full />
                 <InputEdit label="Razão social" value={d1.razao_social} onChange={v => setD1(p => ({ ...p, razao_social: v }))} full />
                 <InputEdit label="Nome fantasia" value={d1.nome_fantasia} onChange={v => setD1(p => ({ ...p, nome_fantasia: v }))} />
@@ -303,7 +302,7 @@ export default function CotacaoDetalhePage() {
           </div>
 
           {/* SEÇÃO 2: Ramo e transporte */}
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+          <div className="card" style={{ padding: 16 }}>
             <SecaoHeader
               titulo="Ramo e cobertura"
               editando={editando === 'ramo'}
@@ -314,7 +313,7 @@ export default function CotacaoDetalhePage() {
             />
 
             {editando === 'ramo' ? (
-              <div className="space-y-4">
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Ramo</label>
                   <div className="flex gap-2 flex-wrap">
@@ -328,7 +327,7 @@ export default function CotacaoDetalhePage() {
                         }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
                           ${d2.ramo === r
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
+                            ? 'var(--accent)'
                             : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50'}`}
                       >
                         {r}
@@ -351,7 +350,7 @@ export default function CotacaoDetalhePage() {
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs text-gray-500">Mercadorias</p>
                     <button type="button" onClick={() => setMercadorias(p => [...p, { tipo: '', embarcador: '', percentual: 0 }])}
-                      className="text-xs text-blue-600 flex items-center gap-1"><Plus className="w-3 h-3" /> Adicionar</button>
+                      className="text-xs text-blue-600 flex items-center gap-1"><i className="ti ti-plus" style={{ fontSize: 12 }} /> Adicionar</button>
                   </div>
                   {mercadorias.map((m, i) => (
                     <div key={i} className="flex gap-2 mb-2 items-center">
@@ -362,7 +361,7 @@ export default function CotacaoDetalhePage() {
                       <input value={m.percentual} type="number" placeholder="%" onChange={e => setMercadorias(p => p.map((x, j) => j === i ? { ...x, percentual: Number(e.target.value) } : x))}
                         className="w-16 px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs text-gray-900 dark:text-white" />
                       <button onClick={() => setMercadorias(p => p.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600">
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <i className="ti ti-trash" style={{ fontSize: 14 }} />
                       </button>
                     </div>
                   ))}
@@ -373,7 +372,7 @@ export default function CotacaoDetalhePage() {
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs text-gray-500">Percursos</p>
                     <button type="button" onClick={() => setPercursos(p => [...p, { origem: '', destino: '', percentual: 0 }])}
-                      className="text-xs text-blue-600 flex items-center gap-1"><Plus className="w-3 h-3" /> Adicionar</button>
+                      className="text-xs text-blue-600 flex items-center gap-1"><i className="ti ti-plus" style={{ fontSize: 12 }} /> Adicionar</button>
                   </div>
                   {percursos.map((p, i) => (
                     <div key={i} className="flex gap-2 mb-2 items-center">
@@ -384,7 +383,7 @@ export default function CotacaoDetalhePage() {
                       <input value={p.percentual} type="number" placeholder="%" onChange={e => setPercursos(prev => prev.map((x, j) => j === i ? { ...x, percentual: Number(e.target.value) } : x))}
                         className="w-16 px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs text-gray-900 dark:text-white" />
                       <button onClick={() => setPercursos(prev => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600">
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <i className="ti ti-trash" style={{ fontSize: 14 }} />
                       </button>
                     </div>
                   ))}
@@ -398,7 +397,7 @@ export default function CotacaoDetalhePage() {
                 <Campo label="Aquaviário" value={c.pct_aquaviario ? `${c.pct_aquaviario}%` : null} />
                 <Campo label="Ferroviário" value={c.pct_ferroviario ? `${c.pct_ferroviario}%` : null} />
                 {mercaRows.length > 0 && (
-                  <div className="mt-2">
+                  <div style={{ marginTop: 8 }}>
                     <p className="text-xs text-gray-400 mb-1">Mercadorias</p>
                     {mercaRows.map((m, i) => (
                       <p key={i} className="text-sm text-gray-700 dark:text-gray-300">
@@ -408,7 +407,7 @@ export default function CotacaoDetalhePage() {
                   </div>
                 )}
                 {percRows.length > 0 && (
-                  <div className="mt-2">
+                  <div style={{ marginTop: 8 }}>
                     <p className="text-xs text-gray-400 mb-1">Percursos</p>
                     {percRows.map((p, i) => (
                       <p key={i} className="text-sm text-gray-700 dark:text-gray-300">
@@ -422,7 +421,7 @@ export default function CotacaoDetalhePage() {
           </div>
 
           {/* SEÇÃO 3: Operação */}
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+          <div className="card" style={{ padding: 16 }}>
             <SecaoHeader
               titulo="Operação mensal"
               editando={editando === 'operacao'}
@@ -433,7 +432,7 @@ export default function CotacaoDetalhePage() {
             />
 
             {editando === 'operacao' ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <InputEdit label="Qtd. embarques / mês" value={d3.qtd_embarques_mes} onChange={v => setD3(p => ({ ...p, qtd_embarques_mes: v }))} type="number" />
                 <InputEdit label="Valor médio por embarque (R$)" value={d3.valor_medio_embarque} onChange={v => setD3(p => ({ ...p, valor_medio_embarque: v }))} type="number" />
                 <InputEdit label="Valor máximo por embarque (R$)" value={d3.valor_maximo_embarque} onChange={v => setD3(p => ({ ...p, valor_maximo_embarque: v }))} type="number" />
@@ -463,7 +462,7 @@ export default function CotacaoDetalhePage() {
                 <Campo label="Detalhes da operação" value={c.detalhes_operacao as string} />
                 <Campo label="Obs. sazonalidade / safra" value={c.obs_sazonalidade as string} />
                 {(c.pct_frota || c.pct_transportadoras || c.pct_agregado || c.pct_autonomo) ? (
-                  <div className="mt-2">
+                  <div style={{ marginTop: 8 }}>
                     <p className="text-xs text-gray-400 mb-1">Motoristas</p>
                     {c.pct_frota ? <p className="text-sm text-gray-700 dark:text-gray-300">Frota: {c.pct_frota as number}%</p> : null}
                     {c.pct_transportadoras ? <p className="text-sm text-gray-700 dark:text-gray-300">Sub-contratadas: {c.pct_transportadoras as number}%</p> : null}
@@ -477,23 +476,23 @@ export default function CotacaoDetalhePage() {
         </div>
 
         {/* Coluna lateral: histórico */}
-        <div className="space-y-4">
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div className="card" style={{ padding: 16 }}>
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Histórico</h3>
             {historico.length === 0 ? (
-              <p className="text-xs text-gray-400">Nenhum registro.</p>
+              <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>Nenhum registro.</p>
             ) : (
               <div className="space-y-3">
                 {[...historico].reverse().map((h, i) => (
-                  <div key={i} className="flex gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
+                  <div key={i} style={{ display: "flex", gap: 8 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", marginTop: 4, flexShrink: 0 }} />
                     <div>
-                      <p className="text-xs text-gray-700 dark:text-gray-300">
+                      <p style={{ fontSize: 12, color: "var(--text-1)" }}>
                         {h.evento === 'cotacao_criada' && 'Cotação criada'}
                         {h.evento === 'mudanca_status' && `Status: ${statusConfig[(h.detalhes as Record<string, unknown>)?.para as StatusCotacao]?.label ?? h.evento}`}
                         {!['cotacao_criada', 'mudanca_status'].includes(h.evento as string) && h.evento as string}
                       </p>
-                      <p className="text-xs text-gray-400">
+                      <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
                         {new Date(h.criado_em as string).toLocaleString('pt-BR')}
                         {(h.usuario as Record<string, unknown>)?.nome ? ` · ${(h.usuario as Record<string, unknown>).nome}` : ''}
                       </p>
@@ -505,25 +504,25 @@ export default function CotacaoDetalhePage() {
           </div>
 
           {/* Ações futuras (PDF, e-mail) */}
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+          <div className="card" style={{ padding: 16 }}>
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Ações</h3>
             <div className="space-y-2">
               <button
                 onClick={() => setShowPDF(true)}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 6, fontSize: 13, color: "var(--text-1)", background: "var(--bg-page)", border: "1px solid var(--border-color)", cursor: "pointer", transition: "background .1s" }}
               >
-                <FileText className="w-4 h-4 text-gray-400" />
+                <i className="ti ti-file-text" style={{ fontSize: 15, color: "var(--text-3)" }} />
                 Gerar PDF / Imprimir
               </button>
               <button
                 onClick={() => setShowEmail(true)}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 6, fontSize: 13, color: "var(--text-1)", background: "var(--bg-page)", border: "1px solid var(--border-color)", cursor: "pointer", transition: "background .1s" }}
               >
                 <span className="text-base leading-none">✉️</span> Enviar por e-mail
               </button>
               <button
                 onClick={() => setShowWhatsApp(true)}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 6, fontSize: 13, color: "var(--text-1)", background: "var(--bg-page)", border: "1px solid var(--border-color)", cursor: "pointer", transition: "background .1s" }}
               >
                 <span className="text-base leading-none">💬</span> Enviar pelo WhatsApp
               </button>

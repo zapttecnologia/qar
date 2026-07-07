@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Save, Lock, Unlock, AlertTriangle, Users, FileText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
 interface Corretora {
   id: string; nome: string; cnpj: string | null
@@ -14,12 +14,22 @@ interface Corretora {
   status_assinatura: string; bloqueada: boolean
   bloqueada_motivo: string | null; criado_em: string
 }
-
 interface Membro {
-  id: string
-  papel: string
-  convite_aceito: boolean
+  id: string; papel: string
   usuario: { nome: string; email: string } | null
+}
+
+const dark = {
+  card: { background: '#161b22', border: '1px solid #30363d', borderRadius: 10, marginBottom: 14 },
+  cardHeader: { display: 'flex', alignItems: 'center', gap: 8, padding: '14px 16px', borderBottom: '1px solid #30363d' } as React.CSSProperties,
+  cardBody: { padding: 16 } as React.CSSProperties,
+  label: { display: 'block', fontSize: 12, fontWeight: 500, color: '#8b949e', marginBottom: 5 } as React.CSSProperties,
+  input: { width: '100%', padding: '8px 12px', background: '#0d1117', border: '1px solid #30363d', borderRadius: 6, color: '#e6edf3', fontSize: 13, outline: 'none', boxSizing: 'border-box' } as React.CSSProperties,
+  select: { width: '100%', padding: '8px 12px', background: '#0d1117', border: '1px solid #30363d', borderRadius: 6, color: '#e6edf3', fontSize: 13, outline: 'none', boxSizing: 'border-box' } as React.CSSProperties,
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div style={{ marginBottom: 12 }}><label style={dark.label}>{label}</label>{children}</div>
 }
 
 export default function AdminCorretoraDetalhePage() {
@@ -35,21 +45,16 @@ export default function AdminCorretoraDetalhePage() {
   const [salvando, setSalvando] = useState(false)
   const [form, setForm] = useState<Partial<Corretora>>({})
   const setF = (k: string, v: string | boolean) => setForm(p => ({ ...p, [k]: v }))
-  const [aviso, setAviso] = useState(searchParams.get('novo') === '1' ? 'Corretora criada. Crie o usuário admin manualmente em Authentication → Users e vincule-o.' : '')
+  const [aviso, setAviso] = useState(searchParams.get('novo') === '1' ? 'Corretora criada. Crie o usuário admin manualmente em Authentication → Users no Supabase.' : '')
 
   useEffect(() => {
     async function carregar() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const corRes = await (supabase as any).from('corretoras').select('*').eq('id', id).single()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const membRes = await (supabase as any).from('membros').select('id, papel, convite_aceito, usuario:usuarios(nome, email)').eq('corretora_id', id)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const metRes = await (supabase as any).from('vw_metricas_corretoras').select('total_cotacoes, cotacoes_mes_atual, total_membros').eq('id', id).single()
-
-      if (corRes.data) {
-        setCorretora(corRes.data as Corretora)
-        setForm(corRes.data as Corretora)
-      }
+      const sb = supabase as any
+      const corRes = await sb.from('corretoras').select('*').eq('id', id).single()
+      const membRes = await sb.from('membros').select('id, papel, usuario:usuarios(nome, email)').eq('corretora_id', id)
+      const metRes = await sb.from('vw_metricas_corretoras').select('total_cotacoes, cotacoes_mes_atual, total_membros').eq('id', id).single()
+      if (corRes.data) { setCorretora(corRes.data as Corretora); setForm(corRes.data as Corretora) }
       setMembros((membRes.data ?? []) as Membro[])
       setMetricas((metRes.data ?? {}) as Record<string, number>)
     }
@@ -74,165 +79,129 @@ export default function AdminCorretoraDetalhePage() {
     const novoEstado = !form.bloqueada
     const motivo = novoEstado ? prompt('Motivo do bloqueio:') : null
     if (novoEstado && !motivo) return
-    await supabase.from('corretoras').update({
-      bloqueada: novoEstado,
-      bloqueada_motivo: motivo,
-      status_assinatura: novoEstado ? 'cancelada' : 'ativa',
-    } as never).eq('id', id)
+    await supabase.from('corretoras').update({ bloqueada: novoEstado, bloqueada_motivo: motivo, status_assinatura: novoEstado ? 'cancelada' : 'ativa' } as never).eq('id', id)
     setForm(p => ({ ...p, bloqueada: novoEstado, status_assinatura: novoEstado ? 'cancelada' : 'ativa' }))
     setAviso(novoEstado ? 'Corretora bloqueada.' : 'Corretora desbloqueada.')
     setTimeout(() => setAviso(''), 3000)
   }
 
-  if (!corretora) return <div className="p-6 text-sm text-gray-400">Carregando...</div>
+  if (!corretora) return <div style={{ padding: 40, textAlign: 'center', color: '#8b949e', fontSize: 13 }}>Carregando...</div>
 
-  const PLANO_COR: Record<string, string> = {
-    trial: 'bg-gray-100 text-gray-600', basico: 'bg-blue-100 text-blue-700',
-    profissional: 'bg-purple-100 text-purple-700', enterprise: 'bg-amber-100 text-amber-700',
+  const PLANO_PAPEL: Record<string, { bg: string; text: string }> = {
+    admin: { bg: '#2d0e0e', text: '#f85149' }, aprovador: { bg: '#0d1f3c', text: '#58a6ff' },
+    corretor: { bg: '#0d2b1a', text: '#3fb950' }, visualizador: { bg: '#21262d', text: '#8b949e' },
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div style={{ padding: 20, maxWidth: 900, margin: '0 auto' }}>
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-            <ArrowLeft className="w-4 h-4 text-gray-500" />
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => router.back()} style={{ background: 'none', border: '1px solid #30363d', borderRadius: 6, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#8b949e' }}>
+            <i className="ti ti-arrow-left" style={{ fontSize: 16 }} aria-hidden="true" />
           </button>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{corretora.nome}</h1>
-              {form.bloqueada && (
-                <span className="text-xs px-2 py-0.5 rounded-md bg-red-100 text-red-600 font-medium">Bloqueada</span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h1 style={{ fontSize: 16, fontWeight: 600, color: '#e6edf3' }}>{corretora.nome}</h1>
+              {form.bloqueada && <span style={{ background: '#2d0e0e', color: '#f85149', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500 }}>Bloqueada</span>}
             </div>
-            <p className="text-sm text-gray-500">{corretora.cnpj ?? 'CNPJ não informado'} · desde {new Date(corretora.criado_em).toLocaleDateString('pt-BR')}</p>
+            <p style={{ fontSize: 12, color: '#8b949e', marginTop: 3 }}>{corretora.cnpj ?? 'CNPJ não informado'} · desde {new Date(corretora.criado_em).toLocaleDateString('pt-BR')}</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={handleBloqueio}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm ${form.bloqueada
-              ? 'border-green-300 text-green-700 hover:bg-green-50'
-              : 'border-red-300 text-red-600 hover:bg-red-50'}`}>
-            {form.bloqueada ? <><Unlock className="w-3.5 h-3.5" /> Desbloquear</> : <><Lock className="w-3.5 h-3.5" /> Bloquear</>}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: 'none', border: `1px solid ${form.bloqueada ? '#3fb950' : '#f85149'}`, borderRadius: 6, color: form.bloqueada ? '#3fb950' : '#f85149', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+            <i className={`ti ${form.bloqueada ? 'ti-lock-open' : 'ti-lock'}`} style={{ fontSize: 13 }} aria-hidden="true" />
+            {form.bloqueada ? 'Desbloquear' : 'Bloquear'}
           </button>
           <button onClick={handleSalvar} disabled={salvando}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50">
-            <Save className="w-3.5 h-3.5" /> {salvando ? 'Salvando...' : 'Salvar'}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: '#7c3aed', border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: salvando ? .7 : 1 }}>
+            <i className="ti ti-device-floppy" style={{ fontSize: 13 }} aria-hidden="true" />
+            {salvando ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
       </div>
 
       {aviso && (
-        <div className={`flex items-center gap-2 px-4 py-3 rounded-lg border mb-4 text-sm ${
-          aviso.includes('Corretora criada') ? 'bg-amber-50 border-amber-200 text-amber-700'
-          : 'bg-green-50 border-green-200 text-green-700'}`}>
-          {aviso.includes('Corretora criada') && <AlertTriangle className="w-4 h-4 flex-shrink-0" />}
+        <div style={{ background: aviso.includes('Corretora criada') ? '#2d1a00' : '#0d2b1a', border: `1px solid ${aviso.includes('Corretora criada') ? '#f59e0b' : '#3fb950'}`, borderRadius: 8, padding: '10px 14px', fontSize: 13, color: aviso.includes('Corretora criada') ? '#f59e0b' : '#3fb950', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <i className={`ti ${aviso.includes('Corretora criada') ? 'ti-alert-triangle' : 'ti-check'}`} style={{ fontSize: 14, flexShrink: 0 }} aria-hidden="true" />
           {aviso}
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
-        {/* Coluna principal */}
-        <div className="col-span-2 space-y-4">
-
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 14 }}>
+        <div>
           {/* Métricas */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'Usuários', value: metricas.total_membros ?? 0, icon: Users },
-              { label: 'Cotações totais', value: metricas.total_cotacoes ?? 0, icon: FileText },
-              { label: 'Cotações este mês', value: metricas.cotacoes_mes_atual ?? 0, icon: FileText },
-            ].map(m => (
-              <div key={m.label} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
-                <p className="text-xs text-gray-500 mb-1">{m.label}</p>
-                <p className="text-xl font-semibold text-gray-900 dark:text-white">{m.value}</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
+            {[['Usuários', metricas.total_membros ?? 0, 'ti-users'], ['Cotações', metricas.total_cotacoes ?? 0, 'ti-file-text'], ['Este mês', metricas.cotacoes_mes_atual ?? 0, 'ti-calendar']].map(([lbl, val, icon]) => (
+              <div key={lbl as string} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '12px 14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <i className={`ti ${icon}`} style={{ fontSize: 14, color: '#8b949e' }} aria-hidden="true" />
+                  <span style={{ fontSize: 11, color: '#8b949e', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.3px' }}>{lbl as string}</span>
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 600, color: '#e6edf3' }}>{val as number}</div>
               </div>
             ))}
           </div>
 
-          {/* Plano e faturamento */}
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Plano e faturamento</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Plano</label>
-                <select value={form.plano_assinatura ?? 'trial'} onChange={e => setF('plano_assinatura', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
-                  {['trial','basico','profissional','enterprise'].map(p => (
-                    <option key={p} value={p} className="capitalize">{p}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Status</label>
-                <select value={form.status_assinatura ?? 'ativa'} onChange={e => setF('status_assinatura', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
-                  <option value="ativa">Ativa</option>
-                  <option value="inadimplente">Inadimplente</option>
-                  <option value="cancelada">Cancelada</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Valor mensal (R$)</label>
-                <input type="number" value={form.plano_valor ?? ''} onChange={e => setF('plano_valor', e.target.value)}
-                  placeholder="0,00"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500" />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Vencimento</label>
-                <input type="date" value={form.plano_vencimento ?? ''} onChange={e => setF('plano_vencimento', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500" />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs text-gray-500 mb-1">Observações de faturamento</label>
-                <input value={form.plano_obs ?? ''} onChange={e => setF('plano_obs', e.target.value)}
-                  placeholder="Ex: Paga via PIX dia 5, NF emitida mensalmente"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500" />
+          {/* Plano */}
+          <div style={dark.card}>
+            <div style={dark.cardHeader}>
+              <i className="ti ti-credit-card" style={{ fontSize: 15, color: '#8b949e' }} aria-hidden="true" />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#e6edf3' }}>Plano e faturamento</span>
+            </div>
+            <div style={dark.cardBody}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                <Field label="Plano">
+                  <select value={form.plano_assinatura ?? 'trial'} onChange={e => setF('plano_assinatura', e.target.value)} style={dark.select}>
+                    {['trial','basico','profissional','enterprise'].map(p => <option key={p} value={p} className="capitalize">{p}</option>)}
+                  </select>
+                </Field>
+                <Field label="Status">
+                  <select value={form.status_assinatura ?? 'ativa'} onChange={e => setF('status_assinatura', e.target.value)} style={dark.select}>
+                    <option value="ativa">Ativa</option>
+                    <option value="inadimplente">Inadimplente</option>
+                    <option value="cancelada">Cancelada</option>
+                  </select>
+                </Field>
+                <Field label="Valor mensal (R$)">
+                  <input type="number" value={form.plano_valor ?? ''} onChange={e => setF('plano_valor', e.target.value)} placeholder="0,00" style={dark.input} />
+                </Field>
+                <Field label="Vencimento">
+                  <input type="date" value={form.plano_vencimento ?? ''} onChange={e => setF('plano_vencimento', e.target.value)} style={dark.input} />
+                </Field>
+                <Field label="Obs. faturamento">
+                  <input value={form.plano_obs ?? ''} onChange={e => setF('plano_obs', e.target.value)} placeholder="Ex: Paga via PIX dia 5" style={{ ...dark.input, gridColumn: '1 / -1' }} />
+                </Field>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Coluna lateral: membros */}
-        <div className="space-y-4">
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-              Equipe ({membros.length})
-            </h3>
-            {membros.length === 0 ? (
-              <p className="text-xs text-gray-400">Nenhum membro.</p>
-            ) : (
-              <div className="space-y-2">
-                {membros.map(m => (
-                  <div key={m.id} className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                        {m.usuario?.nome?.charAt(0).toUpperCase() ?? '?'}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{m.usuario?.nome ?? '—'}</p>
-                      <p className="text-xs text-gray-400 truncate">{m.usuario?.email ?? '—'}</p>
-                    </div>
-                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium capitalize ${PLANO_COR[m.papel] ?? 'bg-gray-100 text-gray-500'}`}>
-                      {m.papel}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* Equipe */}
+        <div style={dark.card}>
+          <div style={dark.cardHeader}>
+            <i className="ti ti-users" style={{ fontSize: 15, color: '#8b949e' }} aria-hidden="true" />
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#e6edf3' }}>Equipe ({membros.length})</span>
           </div>
-
-          {/* Ações rápidas */}
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Ações</h3>
-            <div className="space-y-2">
-              <a href={`/cotacoes`}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700">
-                <FileText className="w-3.5 h-3.5" />
-                Ver cotações desta corretora
-              </a>
-            </div>
+          <div style={{ padding: '8px 0' }}>
+            {membros.length === 0 ? (
+              <p style={{ padding: '16px', fontSize: 12, color: '#8b949e', textAlign: 'center' }}>Nenhum membro.</p>
+            ) : membros.map(m => {
+              const p = PLANO_PAPEL[m.papel] ?? PLANO_PAPEL.corretor
+              return (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid #21262d' }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1a0f3c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: '#a78bfa', flexShrink: 0 }}>
+                    {m.usuario?.nome?.charAt(0).toUpperCase() ?? '?'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 12, fontWeight: 500, color: '#e6edf3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.usuario?.nome ?? '—'}</p>
+                    <p style={{ fontSize: 11, color: '#8b949e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.usuario?.email ?? '—'}</p>
+                  </div>
+                  <span style={{ background: p.bg, color: p.text, padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 500, whiteSpace: 'nowrap', textTransform: 'capitalize' }}>{m.papel}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>

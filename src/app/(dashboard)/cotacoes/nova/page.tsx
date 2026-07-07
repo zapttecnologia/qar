@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Check, Search, Loader2, Plus, Trash2 } from 'lucide-react'
+
 import { useSessao } from '@/hooks/useSessao'
 import { criarCotacao, atualizarCotacao } from '@/lib/queries/cotacoes'
 import { salvarMercadorias, salvarPercursos } from '@/lib/queries/cotacoes'
@@ -27,21 +28,29 @@ const ETAPAS = ['Cadastro', 'Ramos', 'Operação', 'Histórico', 'Riscos', 'Cond
 // ── Componentes de apoio ─────────────────────────────────────
 function StepHeader({ etapa, total }: { etapa: number; total: number }) {
   return (
-    <div className="flex items-center gap-1.5 mb-6 overflow-x-auto pb-1">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, overflowX: 'auto', flexWrap: 'nowrap' }}>
       {ETAPAS.map((e, i) => {
         const n = i + 1
         const done = etapa > n
         const active = etapa === n
         return (
-          <div key={e} className="flex items-center gap-1.5 flex-shrink-0">
-            <div className={`flex items-center gap-1.5 ${active ? 'text-blue-600' : done ? 'text-green-600' : 'text-gray-400'}`}>
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0
-                ${active ? 'bg-blue-900 text-white' : done ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-500'}`}>
-                {done ? <Check className="w-3 h-3" /> : n}
+          <div key={e} style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <div style={{
+                width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0,
+                background: active ? 'var(--accent)' : done ? '#059669' : 'var(--bg-page)',
+                color: active || done ? '#fff' : 'var(--text-3)',
+                border: active || done ? 'none' : '1px solid var(--border-color)',
+              }}>
+                {done ? <i className="ti ti-check" style={{ fontSize: 11 }} /> : n}
               </div>
-              <span className={`text-xs font-medium hidden sm:block ${active ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>{e}</span>
+              <span style={{
+                fontSize: 12, fontWeight: active ? 600 : 400, whiteSpace: 'nowrap',
+                color: active ? 'var(--text-1)' : done ? '#059669' : 'var(--text-3)',
+              }}>{e}</span>
             </div>
-            {i < total - 1 && <div className="w-4 h-px bg-gray-200 dark:bg-gray-700" />}
+            {i < total - 1 && <div style={{ width: 20, height: 1, background: 'var(--border-color)' }} />}
           </div>
         )
       })}
@@ -50,20 +59,15 @@ function StepHeader({ etapa, total }: { etapa: number; total: number }) {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{children}</label>
+  return <label className="field-label">{children}</label>
 }
 
-function Input({ value, onChange, placeholder, type = 'text', className = '' }: {
-  value: string | number; onChange: (v: string) => void; placeholder?: string; type?: string; className?: string
+function Input({ value, onChange, placeholder, type = 'text' }: {
+  value: string | number; onChange: (v: string) => void; placeholder?: string; type?: string
 }) {
   return (
-    <input
-      type={type}
-      value={value ?? ''}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      className={`w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
-    />
+    <input type={type} value={value ?? ''} onChange={e => onChange(e.target.value)}
+      placeholder={placeholder} className="field-input" style={{ fontSize: 13 }} />
   )
 }
 
@@ -76,7 +80,7 @@ function Textarea({ value, onChange, placeholder, rows = 3 }: {
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+      className="field-input" style={{ resize: "none", fontSize: 13 }}
     />
   )
 }
@@ -94,16 +98,16 @@ function PctTotal({ campos }: { campos: number[] }) {
 function TableAddBtn({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
-      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 mt-2">
-      <Plus className="w-3 h-3" /> Adicionar linha
+      style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--accent)", background: "none", border: "none", cursor: "pointer", marginTop: 8 }}>
+      <i className="ti ti-plus" style={{ fontSize: 13 }} /> Adicionar linha
     </button>
   )
 }
 
 function DelBtn({ onClick }: { onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="text-red-400 hover:text-red-600 p-1">
-      <Trash2 className="w-3.5 h-3.5" />
+    <button type="button" onClick={onClick} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-3)", padding: 4 }}>
+      <i className="ti ti-trash" style={{ fontSize: 15 }} />
     </button>
   )
 }
@@ -356,20 +360,20 @@ export default function NovaCotacaoPage() {
 
   // ── Navegação ────────────────────────────────────────────────
   const Nav = ({ back, next, isLast }: { back?: () => void; next?: () => void; isLast?: boolean }) => (
-    <div className="flex justify-between mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border-color)" }}>
       <button type="button" onClick={back ?? (() => setEtapa(e => e - 1))} disabled={etapa === 1}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30">
-        <ArrowLeft className="w-4 h-4" /> Voltar
+        className="btn-secondary" style={{ fontSize: 13 }}>
+        <i className="ti ti-arrow-left" style={{ fontSize: 14 }} /> Voltar
       </button>
       {!isLast ? (
         <button type="button" onClick={next ?? (() => setEtapa(e => e + 1))}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-900 text-white text-sm font-medium hover:bg-blue-800">
-          Continuar <ArrowRight className="w-4 h-4" />
+          className="btn-primary" style={{ fontSize: 13 }}>
+          Continuar <i className="ti ti-arrow-right" style={{ fontSize: 14 }} />
         </button>
       ) : (
         <button type="button" onClick={handleSalvar} disabled={salvando}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-700 text-white text-sm font-medium hover:bg-green-600 disabled:opacity-50">
-          {salvando ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</> : <><Check className="w-4 h-4" /> Salvar cotação</>}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#059669", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+          {salvando ? "Salvando..." : "✓ Salvar cotação"}
         </button>
       )}
     </div>
@@ -377,134 +381,105 @@ export default function NovaCotacaoPage() {
 
   // ── Render ───────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => router.back()} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-          <ArrowLeft className="w-4 h-4 text-gray-500" />
+    <div style={{ padding: 20, maxWidth: 760, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <button onClick={() => router.push("/cotacoes")} style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid var(--border-color)", background: "var(--bg-card)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-2)" }}>
+          <i className="ti ti-arrow-left" style={{ fontSize: 15 }} />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Nova cotação</h1>
+        <h1 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-1)" }}>Nova cotação</h1>
       </div>
 
       <StepHeader etapa={etapa} total={ETAPAS.length} />
 
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+      <div className="card" style={{ padding: 24 }}>
 
         {/* ══════════ ETAPA 1 — CADASTRO ══════════ */}
         {etapa === 1 && (
-          <div className="space-y-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* CNPJ */}
             <div>
               <Label>CNPJ</Label>
-              <div className="flex gap-2">
-                <input
-                  value={cnpj}
-                  onChange={e => setCnpj(formatCNPJ(e.target.value))}
-                  placeholder="00.000.000/0000-00"
-                  className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={cnpj} onChange={e => setCnpj(formatCNPJ(e.target.value))}
+                  placeholder="00.000.000/0000-00" className="field-input" style={{ flex: 1, fontSize: 13 }} />
                 <button type="button" onClick={handleBuscarCNPJ} disabled={buscandoCNPJ || !validarCNPJ(cnpj)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 disabled:opacity-50">
-                  {buscandoCNPJ ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  {buscandoCNPJ ? 'Buscando...' : 'Buscar'}
+                  className="btn-secondary" style={{ fontSize: 12, whiteSpace: 'nowrap', opacity: (!validarCNPJ(cnpj) || buscandoCNPJ) ? .5 : 1 }}>
+                  <i className={`ti ${buscandoCNPJ ? 'ti-loader-2' : 'ti-search'}`} style={{ fontSize: 13 }} />
+                  {buscandoCNPJ ? 'Buscando...' : 'Receita Federal'}
                 </button>
               </div>
-              {cnpjStatus === 'ok' && <p className="text-xs text-green-600 mt-1">{clienteId ? '✓ Cliente encontrado na base' : '✓ Dados preenchidos pela Receita Federal — cliente será cadastrado automaticamente'}</p>}
-              {cnpjStatus === 'error' && <p className="text-xs text-red-500 mt-1">✗ CNPJ não encontrado</p>}
+              {cnpjStatus === 'ok' && <p style={{ fontSize: 11, color: '#059669', marginTop: 4 }}>{clienteId ? '✓ Cliente encontrado na base' : '✓ Dados preenchidos — cliente será cadastrado automaticamente'}</p>}
+              {cnpjStatus === 'error' && <p style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>✗ CNPJ não encontrado</p>}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
+            {/* Dados cadastrais */}
+            <p className="section-heading">Dados cadastrais</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
                 <Label>Razão social</Label>
                 <Input value={dadosCadastro.razao_social} onChange={v => setC('razao_social', v)} />
               </div>
-              <div>
-                <Label>Nome fantasia</Label>
-                <Input value={dadosCadastro.nome_fantasia} onChange={v => setC('nome_fantasia', v)} />
+              <div><Label>Nome fantasia</Label><Input value={dadosCadastro.nome_fantasia} onChange={v => setC('nome_fantasia', v)} /></div>
+              <div><Label>Atividade principal</Label><Input value={dadosCadastro.atividade_principal} onChange={v => setC('atividade_principal', v)} /></div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Label>Endereço</Label><Input value={dadosCadastro.endereco} onChange={v => setC('endereco', v)} />
               </div>
+              <div><Label>CEP</Label><Input value={dadosCadastro.cep} onChange={v => setC('cep', v)} /></div>
+              <div><Label>Cidade / UF</Label><Input value={dadosCadastro.cidade_uf} onChange={v => setC('cidade_uf', v)} /></div>
+              <div><Label>Site</Label><Input value={dadosCadastro.site} onChange={v => setC('site', v)} /></div>
               <div>
-                <Label>Atividade principal</Label>
-                <Input value={dadosCadastro.atividade_principal} onChange={v => setC('atividade_principal', v)} />
-              </div>
-              <div className="col-span-2">
-                <Label>Endereço</Label>
-                <Input value={dadosCadastro.endereco} onChange={v => setC('endereco', v)} />
-              </div>
-              <div>
-                <Label>CEP</Label>
-                <Input value={dadosCadastro.cep} onChange={v => setC('cep', v)} />
-              </div>
-              <div>
-                <Label>Cidade / UF</Label>
-                <Input value={dadosCadastro.cidade_uf} onChange={v => setC('cidade_uf', v)} />
-              </div>
-              <div>
-                <Label>Site</Label>
-                <Input value={dadosCadastro.site} onChange={v => setC('site', v)} />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <Label>ANTT / RNTRC</Label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const digits = cnpj.replace(/\D/g, '')
-                      const url = digits
-                        ? `https://consultapublica.antt.gov.br/Site/ConsultaRNTRC.aspx?documento=${digits}`
-                        : 'https://consultapublica.antt.gov.br/Site/ConsultaRNTRC.aspx'
-                      window.open(url, '_blank', 'noopener,noreferrer')
-                    }}
-                    className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                    Consultar no site da ANTT
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                  <label className="field-label" style={{ margin: 0 }}>ANTT / RNTRC</label>
+                  <button type="button"
+                    onClick={() => { const d = cnpj.replace(/\D/g, ''); window.open(`https://consultapublica.antt.gov.br/Site/ConsultaRNTRC.aspx${d ? `?documento=${d}` : ''}`, '_blank', 'noopener,noreferrer') }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    <i className="ti ti-external-link" style={{ fontSize: 12 }} /> Consultar ANTT
                   </button>
                 </div>
                 <Input value={dadosCadastro.antt} onChange={v => setC('antt', v)} placeholder="Nº RNTRC" />
               </div>
-              <div>
-                <Label>Contato</Label>
-                <Input value={dadosCadastro.contato_nome} onChange={v => setC('contato_nome', v)} />
-              </div>
-              <div>
-                <Label>Telefone</Label>
-                <Input value={dadosCadastro.contato_telefone} onChange={v => setC('contato_telefone', v)} />
-              </div>
-              <div className="col-span-2">
-                <Label>E-mail</Label>
-                <Input value={dadosCadastro.contato_email} onChange={v => setC('contato_email', v)} type="email" />
-              </div>
             </div>
+
+            {/* Contato */}
+            <p className="section-heading">Contato</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Label>Nome do contato</Label><Input value={dadosCadastro.contato_nome} onChange={v => setC('contato_nome', v)} />
+              </div>
+              <div><Label>Telefone</Label><Input value={dadosCadastro.contato_telefone} onChange={v => setC('contato_telefone', v)} /></div>
+              <div><Label>E-mail</Label><Input value={dadosCadastro.contato_email} onChange={v => setC('contato_email', v)} type="email" /></div>
+            </div>
+
             <Nav next={() => { if (!dadosCadastro.razao_social) { alert('Preencha a Razão Social.'); return } setEtapa(2) }} />
           </div>
         )}
 
         {/* ══════════ ETAPA 2 — RAMOS ══════════ */}
         {etapa === 2 && (
-          <div className="space-y-5">
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             {/* Ramos transportadores */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Transportadores</p>
-              <div className="flex flex-wrap gap-2">
+              <p className="section-heading">Transportadores</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {RAMOS.map(r => (
                   <button key={r} type="button" onClick={() => toggleRamo(r)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
-                      ${ramosSel.includes(r)
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
-                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50'}`}>
+                    style={{ padding: "6px 12px", borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer", border: `1px solid ${ramosSel.includes(r) ? "var(--accent)" : "var(--border-color)"}`, background: ramosSel.includes(r) ? "var(--accent-light)" : "var(--bg-card)", color: ramosSel.includes(r) ? "var(--accent-text)" : "var(--text-2)" }}>
                     {r}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-gray-400 mt-1">Obs: com exceção RC-DC, caso tenha mais de 1 ramo, deverá ser preenchido 1 questionário por ramo.</p>
+              <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 4 }}>Obs: com exceção RC-DC, caso tenha mais de 1 ramo, deverá ser preenchido 1 questionário por ramo.</p>
             </div>
 
             {/* Embarcador */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Embarcador</p>
-              <div className="flex gap-4">
+              <p className="section-heading">Embarcador</p>
+              <div style={{ display: "flex", gap: 16 }}>
                 {[['TN', embTN, setEmbTN], ['Exportação', embExp, setEmbExp], ['Importação', embImp, setEmbImp]].map(([label, val, set]) => (
-                  <label key={label as string} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <label key={label as string} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-1)", cursor: "pointer" }}>
                     <input type="checkbox" checked={val as boolean} onChange={e => (set as (v: boolean) => void)(e.target.checked)}
-                      className="w-4 h-4 rounded" />
+                      style={{ width: 15, height: 15, cursor: "pointer" }} />
                     {label as string}
                   </label>
                 ))}
@@ -513,16 +488,16 @@ export default function NovaCotacaoPage() {
 
             {/* Tipos de transporte */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Tipos de transporte (%)</p>
-              <div className="grid grid-cols-2 gap-3">
+              <p className="section-heading">Tipos de transporte (%)</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 {[['Terrestre', pctTerrestre, setPctTerrestre], ['Aéreo', pctAereo, setPctAereo],
                   ['Aquaviário (Fluvial, Marítimo)', pctAquaviario, setPctAquaviario], ['Ferroviário', pctFerroviario, setPctFerroviario]].map(([lbl, val, set]) => (
-                  <div key={lbl as string} className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600 dark:text-gray-400 w-36 flex-shrink-0">{lbl as string}</span>
+                  <div key={lbl as string} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13, color: "var(--text-2)", width: 144, flexShrink: 0 }}>{lbl as string}</span>
                     <input type="number" min={0} max={100} value={val as number}
                       onChange={e => (set as (v: number) => void)(Number(e.target.value))}
-                      className="w-20 px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-right text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    <span className="text-sm text-gray-400">%</span>
+                      className="field-input" style={{ width: 70, textAlign: "right", fontSize: 13 }} />
+                    <span style={{ fontSize: 13, color: "var(--text-3)" }}>%</span>
                   </div>
                 ))}
               </div>
@@ -531,16 +506,16 @@ export default function NovaCotacaoPage() {
 
             {/* Mercadorias */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Mercadorias</p>
-              <div className="space-y-2">
+              <p className="section-heading">Mercadorias</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {mercadorias.map((m, i) => (
-                  <div key={i} className="flex gap-2 items-center">
+                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <input value={m.tipo} onChange={e => setMercadorias(p => p.map((x, j) => j === i ? { ...x, tipo: e.target.value } : x))}
-                      placeholder="Tipo de mercadoria" className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none" />
+                      placeholder="Tipo de mercadoria" className="field-input" style={{ fontSize: 12 }} />
                     <input value={m.embarcador} onChange={e => setMercadorias(p => p.map((x, j) => j === i ? { ...x, embarcador: e.target.value } : x))}
-                      placeholder="Embarcador" className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none" />
+                      placeholder="Embarcador" className="field-input" style={{ fontSize: 12 }} />
                     <input type="number" value={m.percentual} onChange={e => setMercadorias(p => p.map((x, j) => j === i ? { ...x, percentual: Number(e.target.value) } : x))}
-                      placeholder="%" className="w-16 px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-right text-gray-900 dark:text-white focus:outline-none" />
+                      placeholder="%" className="field-input" style={{ width: 60, textAlign: "right", fontSize: 12 }} />
                     <DelBtn onClick={() => setMercadorias(p => p.filter((_, j) => j !== i))} />
                   </div>
                 ))}
@@ -550,16 +525,16 @@ export default function NovaCotacaoPage() {
 
             {/* Percursos */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Percursos</p>
-              <div className="space-y-2">
+              <p className="section-heading">Percursos</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {percursos.map((p, i) => (
-                  <div key={i} className="flex gap-2 items-center">
+                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <input value={p.origem} onChange={e => setPercursos(prev => prev.map((x, j) => j === i ? { ...x, origem: e.target.value } : x))}
-                      placeholder="Origem (UF/Cidade)" className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none" />
+                      placeholder="Origem (UF/Cidade)" className="field-input" style={{ fontSize: 12 }} />
                     <input value={p.destino} onChange={e => setPercursos(prev => prev.map((x, j) => j === i ? { ...x, destino: e.target.value } : x))}
-                      placeholder="Destino (UF/Cidade)" className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none" />
+                      placeholder="Destino (UF/Cidade)" className="field-input" style={{ fontSize: 12 }} />
                     <input type="number" value={p.percentual} onChange={e => setPercursos(prev => prev.map((x, j) => j === i ? { ...x, percentual: Number(e.target.value) } : x))}
-                      placeholder="%" className="w-16 px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-right text-gray-900 dark:text-white focus:outline-none" />
+                      placeholder="%" className="field-input" style={{ width: 60, textAlign: "right", fontSize: 12 }} />
                     <DelBtn onClick={() => setPercursos(prev => prev.filter((_, j) => j !== i))} />
                   </div>
                 ))}
@@ -570,28 +545,28 @@ export default function NovaCotacaoPage() {
 
             {/* Averbação */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Dados da averbação</p>
-              <div className="flex flex-wrap gap-4 mb-3">
+              <p className="section-heading">Dados da averbação</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
                 {[['AT&M', avAtm, setAvAtm], ['Averbnet', avAverbnet, setAvAverbnet], ['NDD', avNdd, setAvNdd], ['Citnet', avCitnet, setAvCitnet]].map(([lbl, val, set]) => (
-                  <label key={lbl as string} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" checked={val as boolean} onChange={e => (set as (v: boolean) => void)(e.target.checked)} className="w-4 h-4 rounded" />
+                  <label key={lbl as string} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-1)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={val as boolean} onChange={e => (set as (v: boolean) => void)(e.target.checked)} style={{ width: 15, height: 15, cursor: "pointer" }} />
                     {lbl as string}
                   </label>
                 ))}
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" checked={!!avOutro} onChange={e => !e.target.checked && setAvOutro('')} className="w-4 h-4 rounded" />
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-1)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={!!avOutro} onChange={e => !e.target.checked && setAvOutro('')} style={{ width: 15, height: 15, cursor: "pointer" }} />
                     Outro:
                   </label>
                   <input value={avOutro} onChange={e => setAvOutro(e.target.value)} placeholder="Especificar"
-                    className="w-28 px-2 py-1 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none" />
+                    className="field-input" style={{ width: 110, fontSize: 12 }} />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                 <div><Label>Contato — Nome</Label><Input value={avContatoNome} onChange={setAvContatoNome} /></div>
                 <div><Label>E-mail</Label><Input value={avContatoEmail} onChange={setAvContatoEmail} type="email" /></div>
                 <div><Label>Telefone</Label><Input value={avContatoTel} onChange={setAvContatoTel} /></div>
-                <div className="col-span-3"><Label>E-mail para envio da fatura</Label><Input value={avEmailFatura} onChange={setAvEmailFatura} type="email" /></div>
+                <div style={{ gridColumn: "1 / -1" }}><Label>E-mail para envio da fatura</Label><Input value={avEmailFatura} onChange={setAvEmailFatura} type="email" /></div>
               </div>
             </div>
 
@@ -601,34 +576,34 @@ export default function NovaCotacaoPage() {
 
         {/* ══════════ ETAPA 3 — OPERAÇÃO ══════════ */}
         {etapa === 3 && (
-          <div className="space-y-5">
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Operação — Quantidade de viagens e valores/mês</p>
-              <div className="grid grid-cols-2 gap-4">
+              <p className="section-heading">Operação — Quantidade de viagens e valores/mês</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div><Label>Quantidade de embarques</Label><Input value={qtdEmbarques} onChange={setQtdEmbarques} type="number" placeholder="0" /></div>
                 <div><Label>Valor médio por embarque (R$)</Label><Input value={vlrMedio} onChange={setVlrMedio} type="number" placeholder="0,00" /></div>
                 <div><Label>Valor máximo por embarque (R$)</Label><Input value={vlrMaximo} onChange={setVlrMaximo} type="number" placeholder="0,00" /></div>
                 <div><Label>Importância segurada total (R$)</Label><Input value={vlrTotal} onChange={setVlrTotal} type="number" placeholder="0,00" /></div>
-                <div className="col-span-2"><Label>Obs. sazonalidade / safra</Label><Textarea value={obsSazonalidade} onChange={setObsSazonalidade} rows={2} /></div>
+                <div style={{ gridColumn: "1 / -1" }}><Label>Obs. sazonalidade / safra</Label><Textarea value={obsSazonalidade} onChange={setObsSazonalidade} rows={2} /></div>
               </div>
             </div>
 
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Detalhes da operação</p>
+              <p className="section-heading">Detalhes da operação</p>
               <Textarea value={detalhesOp} onChange={setDetalhesOp} rows={4} placeholder="Descrever detalhes da operação..." />
             </div>
 
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Motoristas (%)</p>
-              <div className="grid grid-cols-2 gap-3">
+              <p className="section-heading">Motoristas (%)</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 {[['Frota', pctFrota, setPctFrota], ['Transportadoras (sub-contratadas)', pctTransp, setPctTransp],
                   ['Agregado', pctAgregado, setPctAgregado], ['Autônomo', pctAutonomo, setPctAutonomo]].map(([lbl, val, set]) => (
-                  <div key={lbl as string} className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600 dark:text-gray-400 w-52 flex-shrink-0">{lbl as string}</span>
+                  <div key={lbl as string} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13, color: "var(--text-2)", width: 200, flexShrink: 0 }}>{lbl as string}</span>
                     <input type="number" min={0} max={100} value={val as number}
                       onChange={e => (set as (v: number) => void)(Number(e.target.value))}
-                      className="w-20 px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-right text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    <span className="text-sm text-gray-400">%</span>
+                      className="field-input" style={{ width: 70, textAlign: "right", fontSize: 13 }} />
+                    <span style={{ fontSize: 13, color: "var(--text-3)" }}>%</span>
                   </div>
                 ))}
               </div>
@@ -640,22 +615,22 @@ export default function NovaCotacaoPage() {
 
         {/* ══════════ ETAPA 4 — HISTÓRICO / SINISTROS ══════════ */}
         {etapa === 4 && (
-          <div className="space-y-6">
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             {/* Experiência anterior */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Experiência anterior</p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-gray-200 dark:border-gray-700">
-                    {['Seguradora','Corretor','Ramo','Vigência','Prêmio Pago',''].map(h => <th key={h} className="text-left py-1.5 px-2 text-gray-500 font-medium">{h}</th>)}
+              <p className="section-heading">Experiência anterior</p>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead><tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+                    {['Seguradora','Corretor','Ramo','Vigência','Prêmio Pago',''].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", color: "var(--text-3)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: ".3px" }}>{h}</th>)}
                   </tr></thead>
                   <tbody>
                     {expAnterior.map((e, i) => (
                       <tr key={i}>
                         {(['seguradora','corretor','ramo','vigencia','premio_pago'] as const).map(k => (
-                          <td key={k} className="py-1 px-1">
+                          <td key={k} style={{ padding: "4px" }}>
                             <input value={e[k]} onChange={ev => setExpAnterior(p => p.map((x, j) => j === i ? { ...x, [k]: ev.target.value } : x))}
-                              className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none" />
+                              className="field-input" style={{ fontSize: 12 }} />
                           </td>
                         ))}
                         <td><DelBtn onClick={() => setExpAnterior(p => p.filter((_, j) => j !== i))} /></td>
@@ -669,19 +644,19 @@ export default function NovaCotacaoPage() {
 
             {/* Condição atual */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Condição atual</p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-gray-200 dark:border-gray-700">
-                    {['LMG','Ramo','Taxa','P.O.S.','Prêmio Mínimo',''].map(h => <th key={h} className="text-left py-1.5 px-2 text-gray-500 font-medium">{h}</th>)}
+              <p className="section-heading">Condição atual</p>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead><tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+                    {['LMG','Ramo','Taxa','P.O.S.','Prêmio Mínimo',''].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", color: "var(--text-3)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: ".3px" }}>{h}</th>)}
                   </tr></thead>
                   <tbody>
                     {condicaoAtual.map((c, i) => (
                       <tr key={i}>
                         {(['lmg','ramo','taxa','pos','premio_minimo'] as const).map(k => (
-                          <td key={k} className="py-1 px-1">
+                          <td key={k} style={{ padding: "4px" }}>
                             <input value={c[k]} onChange={ev => setCondicaoAtual(p => p.map((x, j) => j === i ? { ...x, [k]: ev.target.value } : x))}
-                              className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none" />
+                              className="field-input" style={{ fontSize: 12 }} />
                           </td>
                         ))}
                         <td><DelBtn onClick={() => setCondicaoAtual(p => p.filter((_, j) => j !== i))} /></td>
@@ -695,30 +670,30 @@ export default function NovaCotacaoPage() {
 
             {/* Sinistros */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Sinistros</p>
-              <div className="flex gap-4 mb-3">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Experiência:</span>
+              <p className="section-heading">Sinistros</p>
+              <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
+                <span style={{ fontSize: 13, color: "var(--text-2)" }}>Experiência:</span>
                 {[['12', '12 meses'], ['24', '24 meses'], ['36', '36 meses'], ['nao_houve', 'Não houve']].map(([val, lbl]) => (
-                  <label key={val} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <label key={val} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-1)", cursor: "pointer" }}>
                     <input type="checkbox" checked={sinPeriodo === val} onChange={() => setSinPeriodo(p => p === val ? '' : val)}
-                      className="w-4 h-4 rounded" />
+                      style={{ width: 15, height: 15, cursor: "pointer" }} />
                     {lbl}
                   </label>
                 ))}
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-gray-200 dark:border-gray-700">
-                    {['Data','Ramo','Local Origem','Local Destino','Valor Prejuízo',''].map(h => <th key={h} className="text-left py-1.5 px-2 text-gray-500 font-medium">{h}</th>)}
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead><tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+                    {['Data','Ramo','Local Origem','Local Destino','Valor Prejuízo',''].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", color: "var(--text-3)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: ".3px" }}>{h}</th>)}
                   </tr></thead>
                   <tbody>
                     {sinistros.map((s, i) => (
                       <tr key={i}>
                         {(['data_sinistro','ramo','local_origem','local_destino','valor_prejuizo'] as const).map(k => (
-                          <td key={k} className="py-1 px-1">
+                          <td key={k} style={{ padding: "4px" }}>
                             <input value={s[k]} onChange={ev => setSinistros(p => p.map((x, j) => j === i ? { ...x, [k]: ev.target.value } : x))}
                               placeholder={k === 'data_sinistro' ? 'DD/MM/AAAA' : ''}
-                              className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none" />
+                              className="field-input" style={{ fontSize: 12 }} />
                           </td>
                         ))}
                         <td><DelBtn onClick={() => setSinistros(p => p.filter((_, j) => j !== i))} /></td>
@@ -739,22 +714,22 @@ export default function NovaCotacaoPage() {
 
         {/* ══════════ ETAPA 5 — GERENCIAMENTO DE RISCOS ══════════ */}
         {etapa === 5 && (
-          <div className="space-y-6">
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             {/* DDRs */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">DDRs</p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-gray-200 dark:border-gray-700">
-                    {['Embarcador','Seguradora','LMG','Vigência',''].map(h => <th key={h} className="text-left py-1.5 px-2 text-gray-500 font-medium">{h}</th>)}
+              <p className="section-heading">DDRs</p>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead><tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+                    {['Embarcador','Seguradora','LMG','Vigência',''].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", color: "var(--text-3)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: ".3px" }}>{h}</th>)}
                   </tr></thead>
                   <tbody>
                     {ddrs.map((d, i) => (
                       <tr key={i}>
                         {(['embarcador','seguradora','lmg','vigencia'] as const).map(k => (
-                          <td key={k} className="py-1 px-1">
+                          <td key={k} style={{ padding: "4px" }}>
                             <input value={d[k]} onChange={ev => setDdrs(p => p.map((x, j) => j === i ? { ...x, [k]: ev.target.value } : x))}
-                              className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none" />
+                              className="field-input" style={{ fontSize: 12 }} />
                           </td>
                         ))}
                         <td><DelBtn onClick={() => setDdrs(p => p.filter((_, j) => j !== i))} /></td>
@@ -768,11 +743,11 @@ export default function NovaCotacaoPage() {
 
             {/* Gerenciadoras */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Gerenciamento de riscos</p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="text-left py-1.5 px-2 text-gray-500 font-medium">Gerenciadora</th>
+              <p className="section-heading">Gerenciamento de riscos</p>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead><tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+                    <th style={{ textAlign: "left", padding: "6px 8px", color: "var(--text-3)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: ".3px" }}>Gerenciadora</th>
                     <th className="text-center py-1.5 px-2 text-gray-500 font-medium">Cadastro</th>
                     <th className="text-center py-1.5 px-2 text-gray-500 font-medium">Vitimologia</th>
                     <th className="text-center py-1.5 px-2 text-gray-500 font-medium">Monitoramento</th>
@@ -781,10 +756,10 @@ export default function NovaCotacaoPage() {
                   <tbody>
                     {gerenciadoras.map((g, i) => (
                       <tr key={i}>
-                        <td className="py-1 px-1">
+                        <td style={{ padding: "4px" }}>
                           <input value={g.gerenciadora} onChange={e => setGerenciadoras(p => p.map((x, j) => j === i ? { ...x, gerenciadora: e.target.value } : x))}
                             placeholder="Nome da gerenciadora"
-                            className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none" />
+                            className="field-input" style={{ fontSize: 12 }} />
                         </td>
                         {(['possui_cadastro','possui_vitimologia','possui_monitoramento'] as const).map(k => (
                           <td key={k} className="text-center py-1">
@@ -802,16 +777,16 @@ export default function NovaCotacaoPage() {
 
             {/* Rastreador */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Rastreador</p>
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2">
+              <p className="section-heading">Rastreador</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Label>Fornecedor</Label>
                   <input value={rastrFornecedor} onChange={e => setRastrFornecedor(e.target.value)}
-                    className="px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none w-36" />
+                    className="field-input" style={{ width: 140, fontSize: 13 }} />
                 </div>
                 {[['gsm_gprs','GSM/GPRS'], ['hibrido','Híbrido'], ['rf_fixo_isca','RF Fixo / Isca']].map(([val, lbl]) => (
-                  <label key={val} className="flex items-center gap-1.5 text-sm cursor-pointer">
-                    <input type="checkbox" checked={rastrTipo === val} onChange={() => setRastrTipo(p => p === val ? '' : val)} className="w-4 h-4 rounded" />
+                  <label key={val} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-1)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={rastrTipo === val} onChange={() => setRastrTipo(p => p === val ? '' : val)} style={{ width: 15, height: 15, cursor: "pointer" }} />
                     {lbl}
                   </label>
                 ))}
@@ -828,22 +803,22 @@ export default function NovaCotacaoPage() {
 
         {/* ══════════ ETAPA 6 — CONDIÇÕES ══════════ */}
         {etapa === 6 && (
-          <div className="space-y-6">
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             {/* Condições pretendidas */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Condições pretendidas</p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-gray-200 dark:border-gray-700">
-                    {['LMG','Ramo','Taxa','P.O.S. (Franquia)','Prêmio Mínimo',''].map(h => <th key={h} className="text-left py-1.5 px-2 text-gray-500 font-medium">{h}</th>)}
+              <p className="section-heading">Condições pretendidas</p>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead><tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+                    {['LMG','Ramo','Taxa','P.O.S. (Franquia)','Prêmio Mínimo',''].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", color: "var(--text-3)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: ".3px" }}>{h}</th>)}
                   </tr></thead>
                   <tbody>
                     {condPretendidas.map((c, i) => (
                       <tr key={i}>
                         {(['lmg','ramo','taxa','pos_franquia','premio_minimo'] as const).map(k => (
-                          <td key={k} className="py-1 px-1">
+                          <td key={k} style={{ padding: "4px" }}>
                             <input value={c[k]} onChange={ev => setCondPretendidas(p => p.map((x, j) => j === i ? { ...x, [k]: ev.target.value } : x))}
-                              className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none" />
+                              className="field-input" style={{ fontSize: 12 }} />
                           </td>
                         ))}
                         <td><DelBtn onClick={() => setCondPretendidas(p => p.filter((_, j) => j !== i))} /></td>
@@ -857,20 +832,20 @@ export default function NovaCotacaoPage() {
 
             {/* Condições particulares */}
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Condições particulares</p>
+              <p className="section-heading">Condições particulares</p>
               <Textarea value={condParticulares} onChange={setCondParticulares} rows={5} placeholder="Descrever condições particulares..." />
             </div>
 
             {/* Declaração */}
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Declaração</p>
+              <p className="section-heading">Declaração</p>
               <p className="text-xs text-gray-500 leading-relaxed">
                 Declaro que as informações aqui presentes são verídicas e autorizo as seguradoras a realizar quaisquer pesquisas que julgarem necessárias para a apuração dos dados contidos neste questionário. Nesta forma estou ciente que a simples apresentação deste questionário junto às seguradoras do mercado não representa nenhum compromisso de nenhuma delas de aceitar o risco proposto.
               </p>
             </div>
 
             {/* Assinatura */}
-            <div className="grid grid-cols-2 gap-4">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
                 <Label>Local da assinatura</Label>
                 <Input value={assLocal} onChange={setAssLocal} placeholder="Cidade" />

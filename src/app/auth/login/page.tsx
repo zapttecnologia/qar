@@ -20,20 +20,24 @@ export default function LoginPage() {
       setCarregando(false)
       return
     }
-    window.location.href = '/cotacoes'
+    window.location.href = '/dashboard'
   }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f2744', padding: 16 }}>
       <div style={{ width: '100%', maxWidth: 380 }}>
 
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ width: 48, height: 48, background: '#1a6fbf', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
-            <i className="ti ti-truck" style={{ color: '#fff', fontSize: 22 }} aria-hidden="true" />
+        {/* Logo QARtech — Variação 4 */}
+        <div style={{ textAlign: 'left', marginBottom: 36 }}>
+          <div style={{ marginBottom: 4 }}>
+            <span style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', fontSize: 42, fontWeight: 700, color: '#ffffff', letterSpacing: -1 }}>QAR</span>
+            <span style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', fontSize: 42, fontWeight: 300, color: '#58a5f0', letterSpacing: -1 }}>tech</span>
           </div>
-          <h1 style={{ color: '#fff', fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Cargotech</h1>
-          <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13 }}>Cotações de seguro de transporte</p>
+          <div style={{ position: 'relative', marginBottom: 8 }}>
+            <div style={{ height: 2, background: 'rgba(255,255,255,0.1)', borderRadius: 1 }} />
+            <div style={{ height: 2, background: '#58a5f0', borderRadius: 1, width: 66, position: 'absolute', top: 0, left: 0 }} />
+          </div>
+          <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', margin: 0 }}>sistema de cotações</p>
         </div>
 
         {/* Card */}
