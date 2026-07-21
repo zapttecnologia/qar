@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { X, Download, Printer } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 interface Props {
   cotacaoId: string
@@ -10,21 +9,19 @@ interface Props {
 
 export function PDFPreviewModal({ cotacaoId, onClose }: Props) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
-  const [gerando, setGerando] = useState(true)
+  const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
 
   useEffect(() => {
     gerarPDF()
-    return () => {
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
-    }
+    return () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl) }
   }, [cotacaoId])
 
   async function gerarPDF() {
-    setGerando(true)
+    setCarregando(true)
     setErro('')
+    setPdfUrl(null)
     try {
-      // Importação dinâmica para evitar SSR (react-pdf só roda no browser)
       const [
         { pdf },
         { QarPDF },
@@ -39,20 +36,18 @@ export function PDFPreviewModal({ cotacaoId, onClose }: Props) {
         import('@/lib/supabase/client'),
       ])
 
-      const supabase = createClient()
-
-      // Busca cotação + corretora
+      const sb = createClient()
       const cotacao = await buscarCotacao(cotacaoId) as Record<string, unknown>
-      const { data: corretora } = await supabase
+      if (!cotacao) { setErro('Cotação não encontrada.'); setCarregando(false); return }
+
+      const { data: corretora } = await sb
         .from('corretoras')
         .select('nome, nome_exibicao, logo_url, cor_primaria, cor_secundaria, site_url')
         .eq('id', cotacao.corretora_id as string)
         .single()
 
-      // Busca tabelas filhas
       const filhas = await buscarTabelasFilhas(cotacaoId)
 
-      // Gera o PDF
       const blob = await pdf(
         QarPDF({
           corretora: corretora ?? { nome: 'Corretora' },
@@ -71,82 +66,84 @@ export function PDFPreviewModal({ cotacaoId, onClose }: Props) {
       const url = URL.createObjectURL(blob)
       setPdfUrl(url)
     } catch (e) {
-      console.error(e)
-      setErro('Erro ao gerar o PDF. Tente novamente.')
+      console.error('[PDF]', e)
+      setErro('Erro ao gerar PDF. Verifique se todos os dados da cotação estão preenchidos.')
     }
-    setGerando(false)
-  }
-
-  function handleDownload() {
-    if (!pdfUrl) return
-    const a = document.createElement('a')
-    a.href = pdfUrl
-    a.download = `QAR-${cotacaoId.slice(0, 8).toUpperCase()}.pdf`
-    a.click()
+    setCarregando(false)
   }
 
   function handleImprimir() {
     if (!pdfUrl) return
     const win = window.open(pdfUrl)
-    win?.print()
+    win?.addEventListener('load', () => win.print())
+  }
+
+  function handleBaixar() {
+    if (!pdfUrl) return
+    const a = document.createElement('a')
+    a.href = pdfUrl
+    a.download = `QAR-${cotacaoId}.pdf`
+    a.click()
+  }
+
+  const btnSecundario: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
+    borderRadius: 7, border: '1px solid var(--border-color)', background: 'none',
+    fontSize: 12, color: 'var(--text-2)', cursor: 'pointer',
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col" style={{ height: '90vh' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.6)', padding: 16 }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 16, width: '100%', maxWidth: 900, display: 'flex', flexDirection: 'column', height: '90vh', boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
 
-        {/* Header do modal */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Preview — QAR Seguro de Transportes</h2>
-          <div className="flex items-center gap-2">
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="ti ti-file-invoice" style={{ fontSize: 18, color: '#d97706' }} aria-hidden="true" />
+            </div>
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>
+              Preview — QAR Seguro de Transportes
+            </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {pdfUrl && (
               <>
-                <button
-                  onClick={handleImprimir}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <Printer className="w-3.5 h-3.5" /> Imprimir
+                <button onClick={handleImprimir} style={btnSecundario}>
+                  <i className="ti ti-printer" style={{ fontSize: 14 }} aria-hidden="true" /> Imprimir
                 </button>
-                <button
-                  onClick={handleDownload}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-900 text-white text-sm font-medium hover:bg-blue-800"
-                >
-                  <Download className="w-3.5 h-3.5" /> Baixar PDF
+                <button onClick={handleBaixar} style={{ ...btnSecundario, background: 'var(--accent)', color: '#fff', border: 'none', fontWeight: 600 }}>
+                  <i className="ti ti-download" style={{ fontSize: 14 }} aria-hidden="true" /> Baixar PDF
                 </button>
               </>
             )}
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 ml-1">
-              <X className="w-4 h-4 text-gray-500" />
-            </button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 24, padding: 4, marginLeft: 4, lineHeight: 1 }}>×</button>
           </div>
         </div>
 
         {/* Conteúdo */}
-        <div className="flex-1 overflow-hidden bg-gray-100 dark:bg-gray-800 rounded-b-2xl">
-          {gerando && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-sm text-gray-500">Gerando PDF...</p>
-              </div>
+        <div style={{ flex: 1, overflow: 'hidden', background: 'var(--bg-page)', borderRadius: '0 0 16px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {carregando && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ width: 36, height: 36, border: '3px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 14px' }} />
+              <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>Gerando PDF...</p>
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
           )}
-
-          {erro && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <p className="text-sm text-red-500 mb-3">{erro}</p>
-                <button onClick={gerarPDF} className="text-sm text-blue-600 hover:underline">Tentar novamente</button>
+          {erro && !carregando && (
+            <div style={{ textAlign: 'center', maxWidth: 340 }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                <i className="ti ti-alert-circle" style={{ fontSize: 24, color: '#ef4444' }} aria-hidden="true" />
               </div>
+              <p style={{ fontSize: 13, color: '#ef4444', margin: '0 0 16px' }}>{erro}</p>
+              <button onClick={gerarPDF}
+                style={{ padding: '9px 20px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                Tentar novamente
+              </button>
             </div>
           )}
-
-          {pdfUrl && !gerando && (
-            <iframe
-              src={pdfUrl}
-              className="w-full h-full rounded-b-2xl"
-              title="Preview QAR"
-            />
+          {pdfUrl && !carregando && (
+            <iframe src={pdfUrl} style={{ width: '100%', height: '100%', border: 'none', borderRadius: '0 0 16px 16px' }} title="Preview QAR" />
           )}
         </div>
       </div>

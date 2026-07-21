@@ -34,18 +34,35 @@ export async function POST(request: NextRequest) {
       ? new Date(Date.now() + Number(p.duracao_dias) * 86400000).toISOString().split('T')[0]
       : null
 
+    // Extrai campos extras do body
+    const {
+      nome_fantasia, inscricao_estadual, cep, logradouro, numero, complemento, bairro, cidade, uf,
+      responsavel_nome, responsavel_cpf, responsavel_cargo, responsavel_email, responsavel_telefone,
+      banco_nome, banco_agencia, banco_conta, banco_tipo, banco_pix,
+      dia_vencimento, observacoes_internas,
+    } = await request.json().catch(() => ({})) as Record<string, unknown>
+
     // 2. Cria a corretora
     const { data: corretora, error: errCor } = await admin
       .from('corretoras')
       .insert({
-        nome,
-        cnpj: cnpj || null,
-        plano_id,
+        nome, cnpj: cnpj || null, plano_id,
         plano_assinatura: p.nome as string,
         plano_valor: p.valor_mensal as number,
         plano_vencimento: vencimento,
         plano_obs: plano_obs || null,
         status_assinatura: 'ativa',
+        nome_fantasia: nome_fantasia || null,
+        inscricao_estadual: inscricao_estadual || null,
+        cep: cep || null, logradouro: logradouro || null, numero: numero || null,
+        complemento: complemento || null, bairro: bairro || null, cidade: cidade || null, uf: uf || null,
+        responsavel_nome: responsavel_nome || null, responsavel_cpf: responsavel_cpf || null,
+        responsavel_cargo: responsavel_cargo || null, responsavel_email: responsavel_email || null,
+        responsavel_telefone: responsavel_telefone || null,
+        banco_nome: banco_nome || null, banco_agencia: banco_agencia || null,
+        banco_conta: banco_conta || null, banco_tipo: banco_tipo || null, banco_pix: banco_pix || null,
+        dia_vencimento: dia_vencimento ? Number(dia_vencimento) : 5,
+        observacoes_internas: observacoes_internas || null,
       } as never)
       .select()
       .single()

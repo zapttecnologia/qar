@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSessao, SessaoProvider } from '@/hooks/useSessao'
+import { useCotacoes } from '@/hooks/useCotacoes'
 import { ReactQueryProvider } from '@/components/layout/ReactQueryProvider'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
@@ -19,6 +20,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const { usuario, corretora, corretoras, trocarCorretora, sair, carregando, isSuperAdmin } = useSessao()
+  const cota = useCotacoes()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
 
@@ -120,6 +122,26 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
           )
         })}
       </nav>
+
+      {/* Widget de uso de cotações */}
+      {!cota.carregando && cota.limite && (
+        <div style={{ margin: '0 10px 8px', padding: '10px 12px', background: 'rgba(255,255,255,.05)', borderRadius: 8, border: cota.alerta || !cota.pode ? '1px solid rgba(248,81,73,.3)' : '1px solid rgba(255,255,255,.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.8px', fontWeight: 600 }}>Cotações</span>
+            <span style={{ fontSize: 11, color: !cota.pode ? '#f85149' : cota.alerta ? '#f59e0b' : 'rgba(255,255,255,.4)' }}>
+              {cota.usadas}/{cota.limite}
+            </span>
+          </div>
+          <div style={{ height: 4, background: 'rgba(255,255,255,.08)', borderRadius: 2, marginBottom: 5 }}>
+            <div style={{ height: 4, borderRadius: 2, transition: 'width .3s',
+              background: !cota.pode ? '#f85149' : cota.alerta ? '#f59e0b' : '#3fb950',
+              width: `${Math.min((cota.usadas / cota.limite) * 100, 100)}%` }} />
+          </div>
+          <p style={{ fontSize: 10, color: !cota.pode ? '#f85149' : cota.alerta ? '#f59e0b' : 'rgba(255,255,255,.3)', margin: 0 }}>
+            {!cota.pode ? 'Limite atingido — faça upgrade' : cota.alerta ? `${cota.restantes} restantes este mês` : `${cota.restantes} disponíveis`}
+          </p>
+        </div>
+      )}
 
       {/* Rodapé */}
       <div style={{ padding: '10px 10px 14px', borderTop: '1px solid var(--sidebar-border)' }}>

@@ -3,7 +3,7 @@
 
 export type PapelMembro = 'admin' | 'aprovador' | 'corretor' | 'visualizador'
 export type StatusCotacao = 'rascunho' | 'em_analise' | 'pendente_dados' | 'aprovada' | 'enviada' | 'arquivada'
-export type RamoSeguro = 'RCTR-C' | 'RC-DC' | 'RCTA-C' | 'RCT-OM' | 'RCTR-VI' | 'RCA-C'
+export type RamoSeguro = 'RCTR-C' | 'RC-DC' | 'RC-V' | 'RCTA-C' | 'RCT-OM' | 'RCTR-VI' | 'RCA-C'
 
 export interface Corretora {
   id: string

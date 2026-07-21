@@ -10,9 +10,10 @@ import { PDFPreviewModal } from '@/components/pdf/PDFPreviewModal'
 import { EmailModal } from '@/components/email/EmailModal'
 import { WhatsAppModal } from '@/components/whatsapp/WhatsAppModal'
 import { AssinaturaModal } from '@/components/assinatura/AssinaturaModal'
+import { PortalModal } from '@/components/portal/PortalModal'
 import type { StatusCotacao, RamoSeguro } from '@/types/database'
 
-const RAMOS: RamoSeguro[] = ['RCTR-C', 'RC-DC', 'RCTA-C', 'RCT-OM', 'RCTR-VI', 'RCA-C']
+const RAMOS: RamoSeguro[] = ['RCTR-C', 'RC-DC', 'RC-V', 'RCTA-C', 'RCT-OM', 'RCTR-VI', 'RCA-C']
 const STATUS_OPCOES: StatusCotacao[] = ['rascunho', 'em_analise', 'pendente_dados', 'aprovada', 'enviada', 'arquivada']
 
 // Componente de campo editável individual
@@ -78,6 +79,30 @@ function InputEdit({ label, value, onChange, type = 'text', full = false }: {
   )
 }
 
+// Componente de botão de ação — declarado fora para evitar problemas de closure
+function AcaoBtn({ onClick, iconBg, iconColor, icon, label, sub, subColor, border }: {
+  onClick: () => void
+  iconBg: string; iconColor: string; icon: string
+  label: string; sub: string; subColor?: string; border?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px', background: 'none', border: 'none', borderTop: border ? '1px solid var(--border-color)' : 'none', cursor: 'pointer', textAlign: 'left' }}
+      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-page)')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+      <div style={{ width: 36, height: 36, borderRadius: 8, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <i className={`ti ${icon}`} style={{ fontSize: 18, color: iconColor }} aria-hidden="true" />
+      </div>
+      <div>
+        <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)', margin: 0 }}>{label}</p>
+        <p style={{ fontSize: 11, color: subColor ?? 'var(--text-3)', margin: '2px 0 0' }}>{sub}</p>
+      </div>
+    </button>
+  )
+}
+
 export default function CotacaoDetalhePage() {
   const params = useParams()
   const router = useRouter()
@@ -94,6 +119,7 @@ export default function CotacaoDetalhePage() {
   const [d1, setD1] = useState<Record<string, string>>({})
   const [d2, setD2] = useState<Record<string, string | number>>({})
   const [d3, setD3] = useState<Record<string, string | number>>({})
+  const [ramosSel, setRamosSel] = useState<string[]>([])
   const [mercadorias, setMercadorias] = useState<Array<{ tipo: string; embarcador: string; percentual: number }>>([])
   const [percursos, setPercursos] = useState<Array<{ origem: string; destino: string; percentual: number }>>([])
 
@@ -101,11 +127,13 @@ export default function CotacaoDetalhePage() {
   const [showEmail, setShowEmail] = useState(false)
   const [showWhatsApp, setShowWhatsApp] = useState(false)
   const [showAssinatura, setShowAssinatura] = useState(false)
+  const [showPortal, setShowPortal] = useState(false)
 
-  const { data: cotacao, isLoading } = useQuery({
+  const { data: cotacao, isLoading, isError, error } = useQuery({
     queryKey: ['cotacao', id],
     queryFn: () => buscarCotacao(id),
     enabled: !!id,
+    retry: 1,
   })
 
   function iniciarEdicao(secao: string) {
@@ -131,6 +159,10 @@ export default function CotacaoDetalhePage() {
     }
 
     if (secao === 'ramo') {
+      // Carrega ramos do array se disponível
+      const ramosArr = (c.ramos as string[] | null)
+      if (ramosArr?.length) setRamosSel(ramosArr)
+      else if (c.ramo) setRamosSel([c.ramo as string])
       setD2({
         ramo: c.ramo as string ?? '',
         pct_terrestre: c.pct_terrestre as number ?? 0,
@@ -211,6 +243,16 @@ export default function CotacaoDetalhePage() {
   }
 
   if (isLoading) return <div className="p-6 text-sm text-gray-400">Carregando cotação...</div>
+  if (isError) return (
+    <div style={{ padding: 40, textAlign: 'center' }}>
+      <p style={{ fontSize: 14, color: '#f85149', marginBottom: 8 }}>Erro ao carregar cotação</p>
+      <p style={{ fontSize: 12, color: '#8b949e', marginBottom: 16 }}>{String(error)}</p>
+      <button onClick={() => router.push('/cotacoes')}
+        style={{ padding: '8px 16px', background: '#1a6fbf', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
+        Voltar para cotações
+      </button>
+    </div>
+  )
   if (!cotacao) return <div className="p-6 text-sm text-gray-400">Cotação não encontrada.</div>
 
   const c = cotacao as Record<string, unknown>
@@ -220,6 +262,7 @@ export default function CotacaoDetalhePage() {
   const historico = c.historico_cotacao as Array<Record<string, unknown>> ?? []
 
   return (
+    <>
     <div style={{ padding: 20, maxWidth: 960, margin: "0 auto" }}>
 
       {/* Header */}
@@ -233,13 +276,26 @@ export default function CotacaoDetalhePage() {
               {c.razao_social as string ?? c.cnpj as string}
             </h1>
             <p style={{ fontSize: 12, color: "var(--text-3)" }}>
-              {formatCNPJ(c.cnpj as string)} · {c.ramo as string}
+              {formatCNPJ(c.cnpj as string)} · {
+                (c.ramos as string[] | null)?.length 
+                  ? (c.ramos as string[]).join(', ')
+                  : (c.ramo as string) ?? ''
+              }
             </p>
           </div>
         </div>
 
         {/* Status + ações */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {/* Botão Editar cotação — abre o wizard pré-preenchido */}
+          {['rascunho', 'em_analise', 'pendente_dados'].includes(c.status as string) && (
+            <button
+              onClick={() => router.push(`/cotacoes/nova?editar=${id}`)}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+              <i className="ti ti-pencil" style={{ fontSize: 14 }} aria-hidden="true" />
+              Editar cotação
+            </button>
+          )}
           <select
             value={c.status as string}
             onChange={e => mudarStatus(e.target.value as StatusCotacao)}
@@ -315,20 +371,17 @@ export default function CotacaoDetalhePage() {
             {editando === 'ramo' ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Ramo</label>
-                  <div className="flex gap-2 flex-wrap">
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Ramos (selecione um ou mais)</label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {RAMOS.map(r => (
                       <button
                         key={r}
                         type="button"
                         onClick={() => {
+                          setRamosSel(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
                           setD2(p => ({ ...p, ramo: r }))
-                          if (r === 'RCTR-C') setD2(p => ({ ...p, ramo: r, pct_terrestre: 100, pct_aereo: 0, pct_aquaviario: 0, pct_ferroviario: 0 }))
                         }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
-                          ${d2.ramo === r
-                            ? 'var(--accent)'
-                            : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50'}`}
+                        style={{ padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${ramosSel.includes(r) ? 'var(--accent)' : 'var(--border-color)'}`, background: ramosSel.includes(r) ? 'var(--accent-light)' : 'var(--bg-card)', color: ramosSel.includes(r) ? 'var(--accent-text)' : 'var(--text-2)' }}
                       >
                         {r}
                       </button>
@@ -391,7 +444,11 @@ export default function CotacaoDetalhePage() {
               </div>
             ) : (
               <div>
-                <Campo label="Ramo" value={c.ramo as string} />
+                <Campo label="Ramo{(c.ramos as string[] | null)?.length && (c.ramos as string[]).length > 1 ? 's' : ''}" value={
+                  (c.ramos as string[] | null)?.length 
+                    ? (c.ramos as string[]).join(', ')
+                    : (c.ramo as string) ?? '—'
+                } />
                 <Campo label="Terrestre" value={c.pct_terrestre ? `${c.pct_terrestre}%` : null} />
                 <Campo label="Aéreo" value={c.pct_aereo ? `${c.pct_aereo}%` : null} />
                 <Campo label="Aquaviário" value={c.pct_aquaviario ? `${c.pct_aquaviario}%` : null} />
@@ -503,83 +560,104 @@ export default function CotacaoDetalhePage() {
             )}
           </div>
 
-          {/* Ações futuras (PDF, e-mail) */}
-          <div className="card" style={{ padding: 16 }}>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Ações</h3>
-            <div className="space-y-2">
-              <button
-                onClick={() => setShowPDF(true)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 6, fontSize: 13, color: "var(--text-1)", background: "var(--bg-page)", border: "1px solid var(--border-color)", cursor: "pointer", transition: "background .1s" }}
-              >
-                <i className="ti ti-file-text" style={{ fontSize: 15, color: "var(--text-3)" }} />
-                Gerar PDF / Imprimir
-              </button>
-              <button
-                onClick={() => setShowEmail(true)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 6, fontSize: 13, color: "var(--text-1)", background: "var(--bg-page)", border: "1px solid var(--border-color)", cursor: "pointer", transition: "background .1s" }}
-              >
-                <span className="text-base leading-none">✉️</span> Enviar por e-mail
-              </button>
-              <button
-                onClick={() => setShowWhatsApp(true)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: 6, fontSize: 13, color: "var(--text-1)", background: "var(--bg-page)", border: "1px solid var(--border-color)", cursor: "pointer", transition: "background .1s" }}
-              >
-                <span className="text-base leading-none">💬</span> Enviar pelo WhatsApp
-              </button>
-              <button
+          {/* Ações */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-color)' }}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.8px', margin: 0 }}>Ações</p>
+            </div>
+            <div>
+
+              {/* PDF */}
+              <AcaoBtn onClick={() => setShowPDF(true)} iconBg="#fef3c7" iconColor="#d97706" icon="ti-file-invoice" label="Gerar PDF" sub="Visualizar, imprimir ou baixar" />
+
+              {/* E-mail */}
+              <AcaoBtn onClick={() => setShowEmail(true)} iconBg="#ede9fe" iconColor="#7c3aed" icon="ti-mail" label="Enviar por e-mail" sub="Enviar QAR para o contato" border />
+
+              {/* WhatsApp */}
+              <AcaoBtn onClick={() => setShowWhatsApp(true)} iconBg="#dcfce7" iconColor="#16a34a" icon="ti-brand-whatsapp" label="WhatsApp" sub="Compartilhar via WhatsApp" border />
+
+              {/* Portal */}
+              <AcaoBtn
+                onClick={() => setShowPortal(true)}
+                iconBg={c.portal_status === 'confirmado' ? '#dcfce7' : c.portal_status ? '#fef3c7' : '#e0f2fe'}
+                iconColor={c.portal_status === 'confirmado' ? '#16a34a' : c.portal_status ? '#d97706' : '#0284c7'}
+                icon="ti-world"
+                label="Portal da transportadora"
+                sub={c.portal_status === 'confirmado' ? '✓ Confirmado pela transportadora'
+                  : c.portal_status === 'ajuste_solicitado' ? '⚠ Ajuste solicitado'
+                  : c.portal_status === 'visualizado' ? 'Visualizado — aguardando confirmação'
+                  : c.portal_status === 'enviado' ? 'Link enviado — aguardando acesso'
+                  : 'Enviar link para a transportadora'}
+                subColor={c.portal_status === 'confirmado' ? '#16a34a' : c.portal_status ? '#d97706' : undefined}
+                border
+              />
+
+              {/* Assinatura */}
+              <AcaoBtn
                 onClick={() => setShowAssinatura(true)}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              >
-                <span className="text-base leading-none">✍️</span>
-                <span className={c.assinatura_status ? 'text-purple-600 dark:text-purple-400 font-medium' : 'text-gray-700 dark:text-gray-300'}>
-                  {c.assinatura_status === 'pendente' ? 'Assinatura pendente'
-                    : c.assinatura_status === 'assinado' ? 'Documento assinado ✓'
-                    : 'Assinar digitalmente'}
-                </span>
-              </button>
+                iconBg={c.assinatura_status === 'assinado' ? '#dcfce7' : '#f3e8ff'}
+                iconColor={c.assinatura_status === 'assinado' ? '#16a34a' : '#9333ea'}
+                icon="ti-signature"
+                label="Assinatura digital"
+                sub={c.assinatura_status === 'assinado' ? '✓ Documento assinado'
+                  : c.assinatura_status === 'pendente' ? 'Aguardando assinatura'
+                  : 'Enviar para assinatura'}
+                subColor={c.assinatura_status === 'assinado' ? '#16a34a' : undefined}
+                border
+              />
+
             </div>
 
-            {showPDF && (
-              <PDFPreviewModal cotacaoId={id} onClose={() => setShowPDF(false)} />
-            )}
-            {showEmail && (
-              <EmailModal
-                cotacaoId={id}
-                destinatarioNomePadrao={c.contato_nome as string ?? c.razao_social as string ?? ''}
-                destinatarioEmailPadrao={c.contato_email as string ?? ''}
-                onClose={() => setShowEmail(false)}
-              />
-            )}
-            {showWhatsApp && (
-              <WhatsAppModal
-                cotacaoId={id}
-                razaoSocial={c.razao_social as string}
-                cnpj={c.cnpj as string}
-                ramo={c.ramo as string}
-                contatoNome={c.contato_nome as string}
-                contatoTelefone={c.contato_telefone as string}
-                onClose={() => setShowWhatsApp(false)}
-              />
-            )}
-            {showAssinatura && (
-              <AssinaturaModal
-                cotacaoId={id}
-                razaoSocial={c.razao_social as string}
-                contatoNome={c.contato_nome as string}
-                contatoEmail={c.contato_email as string}
-                assinaturaStatus={c.assinatura_status as string}
-                assinaturaLink={c.assinatura_link as string}
-                onClose={() => setShowAssinatura(false)}
-                onEnviado={() => queryClient.invalidateQueries({ queryKey: ['cotacao', id] })}
-              />
-            )}
-
-            {showPDF && (
-              <PDFPreviewModal cotacaoId={id} onClose={() => setShowPDF(false)} />
-            )}
           </div>
         </div>
       </div>
     </div>
+
+    {/* Modais — renderizados fora do layout para cobrir tela toda */}
+    {showPDF && (
+      <PDFPreviewModal cotacaoId={id} onClose={() => setShowPDF(false)} />
+    )}
+    {showEmail && (
+      <EmailModal
+        cotacaoId={id}
+        destinatarioNomePadrao={(c.contato_nome as string) ?? (c.razao_social as string) ?? ''}
+        destinatarioEmailPadrao={(c.contato_email as string) ?? ''}
+        onClose={() => setShowEmail(false)}
+      />
+    )}
+    {showPortal && (
+      <PortalModal
+        cotacaoId={id}
+        contatoNome={c.contato_nome as string}
+        contatoEmail={c.contato_email as string}
+        portalStatus={c.portal_status as string}
+        onClose={() => setShowPortal(false)}
+        onEnviado={() => queryClient.invalidateQueries({ queryKey: ['cotacao', id] })}
+      />
+    )}
+    {showWhatsApp && (
+      <WhatsAppModal
+        cotacaoId={id}
+        razaoSocial={c.razao_social as string}
+        cnpj={c.cnpj as string}
+        ramo={c.ramo as string}
+        contatoNome={c.contato_nome as string}
+        contatoTelefone={c.contato_telefone as string}
+        onClose={() => setShowWhatsApp(false)}
+      />
+    )}
+    {showAssinatura && (
+      <AssinaturaModal
+        cotacaoId={id}
+        razaoSocial={c.razao_social as string}
+        contatoNome={c.contato_nome as string}
+        contatoEmail={c.contato_email as string}
+        assinaturaStatus={c.assinatura_status as string}
+        assinaturaLink={c.assinatura_link as string}
+        onClose={() => setShowAssinatura(false)}
+        onEnviado={() => queryClient.invalidateQueries({ queryKey: ['cotacao', id] })}
+      />
+    )}
+    </>
   )
 }

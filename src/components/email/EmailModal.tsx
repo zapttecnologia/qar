@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Send, Mail, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 
 interface Props {
   cotacaoId: string
@@ -10,143 +9,103 @@ interface Props {
   onClose: () => void
 }
 
+const inp: React.CSSProperties = {
+  width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13,
+  border: '1px solid var(--border-color)', background: 'var(--bg-page)',
+  color: 'var(--text-1)', outline: 'none', boxSizing: 'border-box',
+}
+const lbl: React.CSSProperties = {
+  display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-2)',
+  textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5,
+}
+
 export function EmailModal({ cotacaoId, destinatarioNomePadrao, destinatarioEmailPadrao, onClose }: Props) {
-  const [destinatarioEmail, setDestinatarioEmail] = useState(destinatarioEmailPadrao ?? '')
-  const [destinatarioNome, setDestinatarioNome] = useState(destinatarioNomePadrao ?? '')
+  const [email, setEmail] = useState(destinatarioEmailPadrao ?? '')
+  const [nome, setNome] = useState(destinatarioNomePadrao ?? '')
   const [enviando, setEnviando] = useState(false)
   const [status, setStatus] = useState<'idle' | 'ok' | 'erro'>('idle')
   const [erroMsg, setErroMsg] = useState('')
   const [remetente, setRemetente] = useState('')
 
   async function handleEnviar() {
-    if (!destinatarioEmail) {
-      setErroMsg('Informe o e-mail do destinatário.')
-      setStatus('erro')
-      return
-    }
-    setEnviando(true)
-    setStatus('idle')
-    setErroMsg('')
-
+    if (!email) { setErroMsg('Informe o e-mail do destinatário.'); setStatus('erro'); return }
+    setEnviando(true); setStatus('idle'); setErroMsg('')
     try {
       const res = await fetch('/api/enviar-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cotacao_id: cotacaoId,
-          destinatario_email: destinatarioEmail,
-          destinatario_nome: destinatarioNome,
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cotacao_id: cotacaoId, destinatario_email: email, destinatario_nome: nome }),
       })
-
       const data = await res.json()
-
-      if (!res.ok) {
-        setErroMsg(data.error ?? 'Erro ao enviar e-mail.')
-        setStatus('erro')
-      } else {
-        setRemetente(data.remetente)
-        setStatus('ok')
-      }
-    } catch {
-      setErroMsg('Erro de conexão. Tente novamente.')
-      setStatus('erro')
-    }
+      if (!res.ok) { setErroMsg(data.error ?? 'Erro ao enviar.'); setStatus('erro') }
+      else { setRemetente(data.remetente); setStatus('ok') }
+    } catch { setErroMsg('Erro de conexão.'); setStatus('erro') }
     setEnviando(false)
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md">
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.6)', padding: 16 }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-2">
-            <Mail className="w-4 h-4 text-blue-600" />
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Enviar cotação por e-mail</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="ti ti-mail" style={{ fontSize: 18, color: '#7c3aed' }} aria-hidden="true" />
+            </div>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Enviar por e-mail</p>
+              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>PDF do QAR em anexo</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
         </div>
 
-        <div className="p-5">
+        <div style={{ padding: 20 }}>
           {status === 'ok' ? (
-            <div className="text-center py-6">
-              <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-              <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">E-mail enviado com sucesso!</p>
-              <p className="text-xs text-gray-500">
-                Enviado de <span className="font-medium">{remetente}</span> para <span className="font-medium">{destinatarioEmail}</span>
-              </p>
-              <p className="text-xs text-gray-400 mt-1">O PDF do QAR foi anexado automaticamente.</p>
-              <button onClick={onClose} className="mt-4 px-4 py-2 rounded-lg bg-blue-900 text-white text-sm font-medium hover:bg-blue-800">
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                <i className="ti ti-circle-check" style={{ fontSize: 26, color: '#16a34a' }} aria-hidden="true" />
+              </div>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 6px' }}>E-mail enviado!</p>
+              <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 4px' }}>De: {remetente}</p>
+              <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 20px' }}>Para: {email}</p>
+              <button onClick={onClose} style={{ padding: '9px 24px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
                 Fechar
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label className="block text-xs text-gray-500 mb-1.5">Nome do destinatário</label>
-                <input
-                  value={destinatarioNome}
-                  onChange={e => setDestinatarioNome(e.target.value)}
-                  placeholder="Nome da transportadora ou contato"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <label style={lbl}>Nome do destinatário</label>
+                <input value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome da transportadora ou contato" style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>E-mail do destinatário *</label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@transportadora.com.br" style={inp} />
               </div>
 
-              <div>
-                <label className="block text-xs text-gray-500 mb-1.5">E-mail do destinatário <span className="text-red-500">*</span></label>
-                <input
-                  type="email"
-                  value={destinatarioEmail}
-                  onChange={e => setDestinatarioEmail(e.target.value)}
-                  placeholder="email@transportadora.com.br"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Preview do que será enviado */}
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-                <p className="text-xs font-medium text-gray-500 mb-2">O e-mail vai conter:</p>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
-                    Template com dados da cotação (empresa, CNPJ, ramo, importância segurada)
+              {/* O que será enviado */}
+              <div style={{ background: 'var(--bg-page)', borderRadius: 8, padding: '12px 14px' }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.5px', margin: '0 0 8px' }}>O e-mail vai conter:</p>
+                {['Template com dados da cotação (empresa, CNPJ, ramo, importância segurada)', 'PDF do QAR completo em anexo', 'Enviado pelo e-mail configurado (seu perfil ou e-mail da corretora)'].map(t => (
+                  <div key={t} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 5 }}>
+                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, marginTop: 5 }} />
+                    <p style={{ fontSize: 12, color: 'var(--text-2)', margin: 0, lineHeight: 1.5 }}>{t}</p>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
-                    PDF do QAR completo em anexo
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
-                    Enviado pelo e-mail configurado (seu perfil ou e-mail da corretora)
-                  </div>
-                </div>
+                ))}
               </div>
 
               {status === 'erro' && (
-                <div className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2.5">
-                  <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs text-red-600 dark:text-red-400">{erroMsg}</p>
-                    {erroMsg.includes('configuração') && (
-                      <a href="/configuracoes" className="text-xs text-red-600 dark:text-red-400 underline mt-1 inline-block">
-                        Ir para Configurações →
-                      </a>
-                    )}
-                  </div>
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 12px', display: 'flex', gap: 8 }}>
+                  <i className="ti ti-alert-circle" style={{ fontSize: 15, color: '#ef4444', flexShrink: 0 }} aria-hidden="true" />
+                  <p style={{ fontSize: 12, color: '#dc2626', margin: 0 }}>{erroMsg}</p>
                 </div>
               )}
 
-              <button
-                onClick={handleEnviar}
-                disabled={enviando || !destinatarioEmail}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-900 text-white text-sm font-medium hover:bg-blue-800 disabled:opacity-50 transition-colors"
-              >
-                {enviando
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
-                  : <><Send className="w-4 h-4" /> Enviar e-mail com PDF</>}
+              <button onClick={handleEnviar} disabled={enviando || !email}
+                style={{ width: '100%', padding: '11px', background: enviando || !email ? '#94a3b8' : 'var(--accent)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: enviando || !email ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <i className={`ti ${enviando ? 'ti-loader-2' : 'ti-send'}`} style={{ fontSize: 15 }} aria-hidden="true" />
+                {enviando ? 'Enviando...' : 'Enviar e-mail com PDF'}
               </button>
             </div>
           )}

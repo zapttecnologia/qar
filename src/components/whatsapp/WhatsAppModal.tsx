@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Download, MessageCircle, Loader2, CheckCircle, Phone } from 'lucide-react'
 
 interface Props {
   cotacaoId: string
@@ -13,245 +12,145 @@ interface Props {
   onClose: () => void
 }
 
+const inp: React.CSSProperties = {
+  width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13,
+  border: '1px solid var(--border-color)', background: 'var(--bg-page)',
+  color: 'var(--text-1)', outline: 'none', boxSizing: 'border-box',
+}
+const lbl: React.CSSProperties = {
+  display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-2)',
+  textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5,
+}
+
 function formatarTelefone(tel: string): string {
-  // Remove tudo exceto números
-  const digits = tel.replace(/\D/g, '')
-  // Adiciona DDI 55 se não tiver
-  if (digits.startsWith('55')) return digits
-  return `55${digits}`
+  const d = tel.replace(/\D/g, '')
+  return d.startsWith('55') ? d : `55${d}`
 }
 
-function validarTelefone(tel: string): boolean {
-  const digits = tel.replace(/\D/g, '')
-  // Mínimo 10 dígitos (DDD + número) sem DDI
-  return digits.length >= 10 && digits.length <= 13
-}
-
-export function WhatsAppModal({
-  cotacaoId, razaoSocial, cnpj, ramo,
-  contatoNome, contatoTelefone, onClose
-}: Props) {
+export function WhatsAppModal({ cotacaoId, razaoSocial, cnpj, ramo, contatoNome, contatoTelefone, onClose }: Props) {
   const [telefone, setTelefone] = useState(contatoTelefone ?? '')
   const [etapa, setEtapa] = useState<'form' | 'baixando' | 'pronto'>('form')
   const [erro, setErro] = useState('')
 
-  function montarMensagem(): string {
-    const empresa = razaoSocial ?? 'sua empresa'
-    const nomeContato = contatoNome ? `*${contatoNome}*` : 'prezado(a)'
-
-    return `Olá, ${nomeContato}! 👋
-
-Segue em anexo o *Questionário de Avaliação de Riscos (QAR)* referente à cotação de seguro de transportes de carga para *${empresa}*.
-
-📋 *Dados da cotação:*
-• Empresa: ${razaoSocial ?? '—'}
-• CNPJ: ${cnpj ?? '—'}
-• Ramo: ${ramo ?? '—'}
-
-O PDF com o QAR completo está em anexo. Por favor, revise as informações e entre em contato caso tenha dúvidas ou precise de ajustes.
-
-Qualquer dúvida, estou à disposição! 😊`
+  function montarMensagem() {
+    return `Olá${contatoNome ? `, *${contatoNome}*` : ''}! 👋\n\nSegue o *QAR (Questionário de Avaliação de Riscos)* para cotação de seguro de transportes.\n\n📋 *Dados:*\n• Empresa: ${razaoSocial ?? '—'}\n• CNPJ: ${cnpj ?? '—'}\n• Ramo: ${ramo ?? '—'}\n\nO PDF está em anexo. Qualquer dúvida, estou à disposição!`
   }
 
   async function handleEnviar() {
-    if (!validarTelefone(telefone)) {
-      setErro('Informe um número de telefone válido com DDD (ex: 11 99999-9999).')
-      return
-    }
-    setErro('')
-    setEtapa('baixando')
-
+    const digits = telefone.replace(/\D/g, '')
+    if (digits.length < 10) { setErro('Informe um telefone válido com DDD.'); return }
+    setErro(''); setEtapa('baixando')
     try {
-      // 1. Gera e baixa o PDF
-      const [
-        { pdf },
-        { QarPDF },
-        { buscarCotacao },
-        { buscarTabelasFilhas },
-        { createClient },
-      ] = await Promise.all([
+      const [{ pdf }, { QarPDF }, { buscarCotacao }, { buscarTabelasFilhas }, { createClient }] = await Promise.all([
         import('@react-pdf/renderer'),
         import('@/components/pdf/QarPDF'),
         import('@/lib/queries/cotacoes'),
         import('@/lib/queries/cotacoes_qar'),
         import('@/lib/supabase/client'),
       ])
-
-      const supabase = createClient()
+      const sb = createClient()
       const cotacao = await buscarCotacao(cotacaoId) as Record<string, unknown>
-      const { data: corretora } = await supabase
-        .from('corretoras')
-        .select('nome, nome_exibicao, logo_url, cor_primaria, cor_secundaria, site_url')
-        .eq('id', cotacao.corretora_id as string)
-        .single()
-
+      const { data: corretora } = await sb.from('corretoras').select('nome, nome_exibicao, logo_url, cor_primaria, cor_secundaria, site_url').eq('id', cotacao.corretora_id as string).single()
       const filhas = await buscarTabelasFilhas(cotacaoId)
-
-      const blob = await pdf(
-        QarPDF({
-          corretora: corretora ?? { nome: 'Corretora' },
-          cotacao: cotacao as never,
-          mercadorias: filhas.mercadorias as never,
-          percursos: filhas.percursos as never,
-          expAnterior: filhas.experiencia as never,
-          condicaoAtual: filhas.condicaoAtual as never,
-          sinistros: filhas.sinistros as never,
-          ddrs: filhas.ddrs as never,
-          gerenciadoras: filhas.gerenciadoras as never,
-          condPretendidas: filhas.condPretendidas as never,
-        })
-      ).toBlob()
-
-      // 2. Dispara o download do PDF
+      const blob = await pdf(QarPDF({ corretora: corretora ?? { nome: 'Corretora' }, cotacao: cotacao as never, mercadorias: filhas.mercadorias as never, percursos: filhas.percursos as never, expAnterior: filhas.experiencia as never, condicaoAtual: filhas.condicaoAtual as never, sinistros: filhas.sinistros as never, ddrs: filhas.ddrs as never, gerenciadoras: filhas.gerenciadoras as never, condPretendidas: filhas.condPretendidas as never })).toBlob()
       const url = URL.createObjectURL(blob)
-      const nomeArquivo = `QAR-${(razaoSocial ?? cnpj ?? 'cotacao').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30)}.pdf`
       const a = document.createElement('a')
-      a.href = url
-      a.download = nomeArquivo
-      a.click()
+      a.href = url; a.download = `QAR-${(razaoSocial ?? cnpj ?? 'cotacao').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30)}.pdf`; a.click()
       URL.revokeObjectURL(url)
-
       setEtapa('pronto')
-    } catch (e) {
-      console.error(e)
-      setErro('Erro ao gerar o PDF. Tente novamente.')
-      setEtapa('form')
-    }
+    } catch { setErro('Erro ao gerar PDF.'); setEtapa('form') }
   }
 
   function handleAbrirWhatsApp() {
-    const numero = formatarTelefone(telefone)
-    const mensagem = encodeURIComponent(montarMensagem())
-    window.open(`https://wa.me/${numero}?text=${mensagem}`, '_blank', 'noopener,noreferrer')
+    window.open(`https://wa.me/${formatarTelefone(telefone)}?text=${encodeURIComponent(montarMensagem())}`, '_blank', 'noopener,noreferrer')
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md">
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.6)', padding: 16 }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-              <MessageCircle className="w-3.5 h-3.5 text-white" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="ti ti-brand-whatsapp" style={{ fontSize: 20, color: '#16a34a' }} aria-hidden="true" />
             </div>
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Enviar pelo WhatsApp</h2>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Enviar pelo WhatsApp</p>
+              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>PDF + mensagem pré-preenchida</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 22, padding: 4, lineHeight: 1 }}>×</button>
         </div>
 
-        <div className="p-5">
+        <div style={{ padding: 20 }}>
 
-          {/* ETAPA 1 — Formulário */}
           {etapa === 'form' && (
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label className="block text-xs text-gray-500 mb-1.5">
-                  Número do WhatsApp <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-2 items-center">
-                  <span className="text-sm text-gray-500 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 flex-shrink-0">
-                    🇧🇷 +55
-                  </span>
-                  <input
-                    type="tel"
-                    value={telefone}
-                    onChange={e => {
-                      setTelefone(e.target.value)
-                      setErro('')
-                    }}
-                    placeholder="(11) 99999-9999"
-                    className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
+                <label style={lbl}>Número do WhatsApp *</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ padding: '9px 12px', background: 'var(--bg-page)', border: '1px solid var(--border-color)', borderRadius: 8, fontSize: 13, color: 'var(--text-2)', flexShrink: 0 }}>🇧🇷 +55</span>
+                  <input type="tel" value={telefone} onChange={e => { setTelefone(e.target.value); setErro('') }} placeholder="(11) 99999-9999" style={{ ...inp, flex: 1 }} />
                 </div>
-                {contatoTelefone && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    Contato cadastrado: {contatoTelefone}
-                  </p>
-                )}
-                {erro && <p className="text-xs text-red-500 mt-1">{erro}</p>}
+                {contatoTelefone && <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>Cadastrado: {contatoTelefone}</p>}
+                {erro && <p style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>{erro}</p>}
               </div>
 
-              {/* Preview da mensagem */}
               <div>
-                <p className="text-xs text-gray-500 mb-2">Preview da mensagem:</p>
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                  <p className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed">
-                    {montarMensagem()}
-                  </p>
+                <label style={lbl}>Preview da mensagem</label>
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px' }}>
+                  <p style={{ fontSize: 12, color: '#166534', whiteSpace: 'pre-line', lineHeight: 1.6, margin: 0 }}>{montarMensagem()}</p>
                 </div>
               </div>
 
-              {/* Instruções do fluxo */}
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 space-y-2">
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400">O que vai acontecer:</p>
-                <div className="flex items-start gap-2">
-                  <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs flex items-center justify-center flex-shrink-0 font-medium">1</span>
-                  <p className="text-xs text-gray-500">O PDF do QAR será <strong>baixado automaticamente</strong> no seu computador</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs flex items-center justify-center flex-shrink-0 font-medium">2</span>
-                  <p className="text-xs text-gray-500">O <strong>WhatsApp Web</strong> abrirá com a mensagem pré-preenchida</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs flex items-center justify-center flex-shrink-0 font-medium">3</span>
-                  <p className="text-xs text-gray-500">Anexe o PDF baixado e envie</p>
-                </div>
+              <div style={{ background: 'var(--bg-page)', borderRadius: 8, padding: '12px 14px' }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.5px', margin: '0 0 8px' }}>Como funciona:</p>
+                {['PDF do QAR será baixado automaticamente', 'WhatsApp Web abrirá com mensagem pronta', 'Anexe o PDF e envie'].map((t, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                    <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--accent)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+                    <p style={{ fontSize: 12, color: 'var(--text-2)', margin: 0 }}>{t}</p>
+                  </div>
+                ))}
               </div>
 
-              <button
-                onClick={handleEnviar}
-                disabled={!telefone}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-500 disabled:opacity-50 transition-colors"
-              >
-                <Download className="w-4 h-4" />
+              <button onClick={handleEnviar} disabled={!telefone}
+                style={{ width: '100%', padding: 11, background: !telefone ? '#94a3b8' : '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !telefone ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <i className="ti ti-download" style={{ fontSize: 15 }} aria-hidden="true" />
                 Baixar PDF e preparar WhatsApp
               </button>
             </div>
           )}
 
-          {/* ETAPA 2 — Baixando */}
           {etapa === 'baixando' && (
-            <div className="text-center py-8">
-              <Loader2 className="w-10 h-10 text-green-500 animate-spin mx-auto mb-3" />
-              <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">Gerando PDF...</p>
-              <p className="text-xs text-gray-500">O download vai iniciar automaticamente em seguida.</p>
+            <div style={{ textAlign: 'center', padding: '30px 0' }}>
+              <div style={{ width: 40, height: 40, border: '3px solid #16a34a', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 14px' }} />
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 4px' }}>Gerando PDF...</p>
+              <p style={{ fontSize: 12, color: 'var(--text-2)', margin: 0 }}>O download vai iniciar automaticamente.</p>
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
           )}
 
-          {/* ETAPA 3 — Pronto para abrir WhatsApp */}
           {etapa === 'pronto' && (
-            <div className="space-y-4">
-              <div className="text-center py-4">
-                <CheckCircle className="w-10 h-10 text-green-500 mx-auto mb-3" />
-                <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">PDF baixado com sucesso!</p>
-                <p className="text-xs text-gray-500">
-                  Verifique a pasta de Downloads do seu computador.<br />
-                  Agora abra o WhatsApp e anexe o arquivo.
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                  <i className="ti ti-circle-check" style={{ fontSize: 26, color: '#16a34a' }} aria-hidden="true" />
+                </div>
+                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 4px' }}>PDF baixado!</p>
+                <p style={{ fontSize: 12, color: 'var(--text-2)', margin: 0 }}>Verifique sua pasta de Downloads.</p>
+              </div>
+              <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 12px' }}>
+                <p style={{ fontSize: 12, color: '#92400e', margin: 0, lineHeight: 1.5 }}>
+                  📎 No WhatsApp Web, clique no ícone de clipe → Documento → selecione o PDF antes de enviar.
                 </p>
               </div>
-
-              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mb-1">📎 Lembre-se:</p>
-                <p className="text-xs text-amber-600 dark:text-amber-500">
-                  No WhatsApp Web, clique no ícone de clipe (📎) → Documento → selecione o PDF baixado antes de enviar.
-                </p>
-              </div>
-
-              <button
-                onClick={handleAbrirWhatsApp}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-500 transition-colors"
-              >
-                <MessageCircle className="w-4 h-4" />
+              <button onClick={handleAbrirWhatsApp}
+                style={{ width: '100%', padding: 11, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <i className="ti ti-brand-whatsapp" style={{ fontSize: 16 }} aria-hidden="true" />
                 Abrir WhatsApp Web
               </button>
-
-              <button
-                onClick={() => setEtapa('form')}
-                className="w-full py-2 text-xs text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={() => setEtapa('form')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-3)', padding: 4 }}>
                 Voltar e alterar número
               </button>
             </div>

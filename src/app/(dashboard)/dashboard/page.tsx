@@ -5,6 +5,8 @@ export const dynamic = 'force-dynamic'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useSessao } from '@/hooks/useSessao'
+import { useCotacoes } from '@/hooks/useCotacoes'
+import { BannerCotacoes } from '@/components/plano/BannerCotacoes'
 import { createClient } from '@/lib/supabase/client'
 import { formatBRL, formatCNPJ } from '@/lib/utils'
 

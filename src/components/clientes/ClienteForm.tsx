@@ -5,6 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useState } from 'react'
 import { buscarDadosCNPJ, formatCNPJ, validarCNPJ } from '@/lib/utils'
+import { useANTT } from '@/hooks/useANTT'
+import { BadgeANTT } from '@/components/antt/BadgeANTT'
 
 const clienteSchema = z.object({
   cnpj:                z.string().refine(validarCNPJ, 'CNPJ inválido'),
@@ -43,6 +45,7 @@ function corSituacao(s: string) {
 
 export function ClienteForm({ defaultValues, onSubmit, salvando, submitLabel = 'Salvar cliente' }: Props) {
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false)
+  const antt = useANTT()
   const [camposAuto, setCamposAuto] = useState<Set<string>>(new Set())
 
   const { register, handleSubmit, setValue, getValues, watch, formState: { errors } } = useForm<ClienteFormData>({
@@ -68,6 +71,15 @@ export function ClienteForm({ defaultValues, onSubmit, salvando, submitLabel = '
       setCamposAuto(new Set(Object.keys(pre)))
     } catch { alert('CNPJ não encontrado na Receita Federal.') }
     setBuscandoCNPJ(false)
+
+    // Consulta OpenCheck — ANTT em paralelo com a Receita
+    const cnpjAtual = getValues('cnpj')
+    const resultadoOC = await antt.consultar(cnpjAtual)
+    if (resultadoOC?.rntrc) {
+      setValue('antt', resultadoOC.rntrc)
+      if (resultadoOC.antt_ativo) setValue('situacao_rntrc', 'Ativo')
+      else if (resultadoOC.status_label === 'Em revisão') setValue('situacao_rntrc', 'Suspenso')
+    }
   }
 
   function abrirANTT() {
@@ -132,14 +144,38 @@ export function ClienteForm({ defaultValues, onSubmit, salvando, submitLabel = '
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <Section title="ANTT / RNTRC" />
-          <button type="button" onClick={abrirANTT}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
-            <i className="ti ti-external-link" style={{ fontSize: 13 }} aria-hidden="true" />
-            Consultar no site da ANTT
-          </button>
+          <BadgeANTT
+            resultado={antt.resultado}
+            consultando={antt.consultando}
+            pendente={antt.pendente}
+            erro={antt.erro}
+            onConsultar={() => antt.consultar(getValues('cnpj'))}
+            compact
+          />
         </div>
+
+        {/* Badge completo quando tem resultado */}
+        {(antt.resultado || (antt.erro && !antt.consultando)) && (
+          <div style={{ marginBottom: 12 }}>
+            <BadgeANTT
+              resultado={antt.resultado}
+              consultando={false}
+              pendente={antt.pendente}
+              erro={antt.erro}
+              onConsultar={() => antt.consultar(getValues('cnpj'))}
+            />
+          </div>
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-          <Field label="Número RNTRC" name="antt" />
+          <div>
+            <label className="field-label">
+              Número RNTRC
+              {antt.resultado?.rntrc && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--accent)', fontWeight: 600 }}>AUTO</span>}
+            </label>
+            <input {...register('antt')} {...inp(antt.resultado?.rntrc ? { background: 'var(--accent-light)', borderColor: 'var(--accent)' } : {})}
+              placeholder="Preenchido automaticamente" />
+          </div>
           <div>
             <label className="field-label">Situação RNTRC</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -156,9 +192,11 @@ export function ClienteForm({ defaultValues, onSubmit, salvando, submitLabel = '
             </div>
           </div>
         </div>
-        <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>
-          Clique em "Consultar no site da ANTT" — o CNPJ será pré-preenchido. Copie o RNTRC e a situação do site.
-        </p>
+        {!antt.resultado && !antt.consultando && (
+          <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>
+            Clique em "Consultar ANTT" ou preencha manualmente após buscar o CNPJ na Receita Federal.
+          </p>
+        )}
       </div>
 
       {/* Contato */}

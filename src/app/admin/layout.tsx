@@ -5,20 +5,41 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
+const NAV = [
+  { href: '/admin', label: 'Dashboard', icon: 'ti-layout-dashboard', exact: true, children: [] },
+  {
+    href: '/admin/corretoras', label: 'Corretoras', icon: 'ti-building', exact: false,
+    children: [
+      { href: '/admin/corretoras', label: 'Todas as corretoras' },
+      { href: '/admin/corretoras?status=ativa', label: 'Ativas' },
+      { href: '/admin/corretoras?status=suspenso', label: 'Suspensas' },
+      { href: '/admin/corretoras?status=bloqueada', label: 'Bloqueadas' },
+      { href: '/admin/corretoras/nova', label: '+ Nova corretora', accent: true },
+    ]
+  },
+  { href: '/admin/financeiro', label: 'Financeiro', icon: 'ti-cash', exact: false, children: [] },
+  { href: '/admin/planos', label: 'Planos', icon: 'ti-crown', exact: false, children: [] },
+  { href: '/admin/super-admins', label: 'Super Admins', icon: 'ti-shield', exact: false, children: [] },
+]
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
   const [verificando, setVerificando] = useState(true)
-  const [email, setEmail] = useState('')
+  const [nomeAdmin, setNomeAdmin] = useState('')
+  const [emailAdmin, setEmailAdmin] = useState('')
+  const [expandidos, setExpandidos] = useState<string[]>(['/admin/corretoras'])
 
   useEffect(() => {
     async function verificar() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/auth/login'); return }
-      const { data } = await supabase.from('super_admins').select('id').eq('usuario_id', user.id).single()
-      if (!data) { router.replace('/cotacoes'); return }
-      setEmail(user.email ?? '')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any).from('super_admins').select('id, nome').eq('usuario_id', user.id).eq('ativo', true).maybeSingle()
+      if (!data) { router.replace('/auth/login'); return }
+      setEmailAdmin(user.email ?? '')
+      setNomeAdmin((data as Record<string,string>).nome || user.email?.split('@')[0] || 'Admin')
       setVerificando(false)
     }
     verificar()
@@ -26,80 +47,89 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (verificando) return (
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d1117' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 32, height: 32, border: '2px solid #7c3aed', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
-        <p style={{ fontSize: 13, color: '#8b949e' }}>Verificando acesso...</p>
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      </div>
+      <div style={{ width: 30, height: 30, border: '2px solid #7c3aed', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 
-  const navItems = [
-    { href: '/admin', label: 'Visão geral', icon: 'ti-layout-dashboard', exact: true },
-    { href: '/admin/corretoras', label: 'Corretoras', icon: 'ti-building', exact: false },
-    { href: '/admin/planos', label: 'Planos', icon: 'ti-crown', exact: false },
-  ]
+  const iniciais = nomeAdmin.split(' ').slice(0,2).map(n => n[0]).join('').toUpperCase() || 'SA'
+
+  function toggle(href: string) {
+    setExpandidos(p => p.includes(href) ? p.filter(h => h !== href) : [...p, href])
+  }
+
+  const s = {
+    sidebar: { width: 228, background: '#13111a', borderRight: '1px solid #1f1729', display: 'flex', flexDirection: 'column', flexShrink: 0 } as React.CSSProperties,
+    navItem: (active: boolean): React.CSSProperties => ({ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 6, margin: '1px 0', cursor: 'pointer', fontSize: 13, fontWeight: active ? 500 : 400, color: active ? '#fff' : 'rgba(255,255,255,.5)', background: active ? '#7c3aed' : 'transparent', userSelect: 'none' as const }),
+    subItem: (active: boolean, accent?: boolean): React.CSSProperties => ({ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', borderRadius: 5, textDecoration: 'none', fontSize: 12, color: accent ? 'rgba(167,139,250,.7)' : active ? '#a78bfa' : 'rgba(255,255,255,.35)', background: active ? 'rgba(124,58,237,.12)' : 'transparent', borderLeft: active ? '2px solid #7c3aed' : '2px solid transparent' }),
+  }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      {/* Sidebar admin — roxa escura */}
-      <aside style={{ width: 220, background: '#13111a', borderRight: '1px solid #2d2438', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-        {/* Logo QARtech admin */}
-        <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid #2d2438' }}>
-          <div style={{ marginBottom: 3 }}>
-            <span style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', fontSize: 20, fontWeight: 700, color: '#ffffff', letterSpacing: -.5 }}>QAR</span>
-            <span style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', fontSize: 20, fontWeight: 300, color: '#a78bfa', letterSpacing: -.5 }}>tech</span>
-          </div>
-          <div style={{ position: 'relative', marginBottom: 5 }}>
-            <div style={{ height: 1.5, background: 'rgba(255,255,255,0.08)', borderRadius: 1 }} />
-            <div style={{ height: 1.5, background: '#7c3aed', borderRadius: 1, width: 30, position: 'absolute', top: 0, left: 0 }} />
-          </div>
-          <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            super admin · {email}
-          </div>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+      <aside style={s.sidebar}>
+        {/* Logo */}
+        <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid #1f1729' }}>
+          <div><span style={{ fontSize: 20, fontWeight: 700, color: '#fff', letterSpacing: -.5 }}>QAR</span><span style={{ fontSize: 20, fontWeight: 300, color: '#a78bfa', letterSpacing: -.5 }}>tech</span></div>
+          <div style={{ height: 1.5, background: 'linear-gradient(90deg,#7c3aed,transparent)', borderRadius: 1, margin: '4px 0' }} />
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,.25)', letterSpacing: 2, textTransform: 'uppercase' }}>painel administrativo</span>
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: '10px 8px' }}>
-          <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.7px', padding: '8px 8px 4px' }}>Gestão</div>
-          {navItems.map(({ href, label, icon, exact }) => {
-            const active = exact ? pathname === href : pathname.startsWith(href)
+        <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
+          {NAV.map(item => {
+            const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
+            const expanded = expandidos.includes(item.href)
+            const hasChildren = item.children.length > 0
+
             return (
-              <Link key={href} href={href}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px',
-                  borderRadius: 6, margin: '1px 0', textDecoration: 'none',
-                  color: active ? '#fff' : 'rgba(255,255,255,.55)',
-                  background: active ? '#7c3aed' : 'transparent',
-                  fontSize: 13, fontWeight: active ? 500 : 400,
-                }}>
-                <i className={`ti ${icon}`} style={{ fontSize: 16, flexShrink: 0 }} aria-hidden="true" />
-                {label}
-              </Link>
+              <div key={item.href}>
+                <div style={s.navItem(active && !hasChildren)}
+                  onClick={() => hasChildren ? toggle(item.href) : router.push(item.href)}
+                  onMouseEnter={e => { if (!(active && !hasChildren)) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,.05)' }}
+                  onMouseLeave={e => { if (!(active && !hasChildren)) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
+                  <i className={`ti ${item.icon}`} style={{ fontSize: 15, flexShrink: 0 }} aria-hidden="true" />
+                  <span style={{ flex: 1 }}>{item.label}</span>
+                  {hasChildren && <i className={`ti ${expanded ? 'ti-chevron-down' : 'ti-chevron-right'}`} style={{ fontSize: 12, color: 'rgba(255,255,255,.25)' }} aria-hidden="true" />}
+                </div>
+                {hasChildren && expanded && (
+                  <div style={{ marginLeft: 20, marginBottom: 4, borderLeft: '1px solid rgba(255,255,255,.06)', paddingLeft: 4 }}>
+                    {item.children.map((child: { href: string; label: string; accent?: boolean }) => {
+                      const ca = pathname + (typeof window !== 'undefined' ? window.location.search : '') === child.href
+                        || (child.href === '/admin/corretoras' && pathname === '/admin/corretoras')
+                      return (
+                        <Link key={child.href} href={child.href} style={s.subItem(ca, child.accent)}>
+                          <i className="ti ti-minus" style={{ fontSize: 8, opacity: .5 }} aria-hidden="true" />
+                          {child.label}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             )
           })}
         </nav>
 
         {/* Rodapé */}
-        <div style={{ padding: '10px 10px 14px', borderTop: '1px solid #2d2438' }}>
-          <Link href="/cotacoes"
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, textDecoration: 'none', color: 'rgba(255,255,255,.4)', fontSize: 12, marginBottom: 4 }}>
-            <i className="ti ti-chevron-left" style={{ fontSize: 14 }} aria-hidden="true" />
-            Voltar ao sistema
+        <div style={{ padding: '10px 10px 14px', borderTop: '1px solid #1f1729' }}>
+          <Link href="/cotacoes" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 10px', borderRadius: 6, textDecoration: 'none', color: 'rgba(255,255,255,.3)', fontSize: 12, marginBottom: 4 }}>
+            <i className="ti ti-arrow-left" style={{ fontSize: 13 }} aria-hidden="true" /> Voltar ao sistema
           </Link>
-          <button
-            onClick={() => supabase.auth.signOut().then(() => router.push('/auth/login'))}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 10px', borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.4)', fontSize: 12 }}>
-            <i className="ti ti-logout" style={{ fontSize: 14 }} aria-hidden="true" />
-            Sair
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: '#fff', flexShrink: 0 }}>{iniciais}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ color: '#e6edf3', fontSize: 12, fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nomeAdmin}</p>
+              <p style={{ color: 'rgba(255,255,255,.28)', fontSize: 10, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emailAdmin}</p>
+            </div>
+            <button onClick={() => supabase.auth.signOut().then(() => router.push('/auth/login'))}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.25)', padding: 2 }} title="Sair">
+              <i className="ti ti-logout" style={{ fontSize: 14 }} aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </aside>
 
-      {/* Conteúdo */}
-      <main style={{ flex: 1, overflow: 'auto', background: '#0d1117' }}>
-        {children}
-      </main>
+      <main style={{ flex: 1, overflow: 'auto', background: '#0d1117' }}>{children}</main>
     </div>
   )
 }

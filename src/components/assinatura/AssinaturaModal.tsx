@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { X, PenLine, Loader2, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react'
 
 interface Props {
   cotacaoId: string
@@ -14,17 +13,17 @@ interface Props {
   onEnviado: () => void
 }
 
-const STATUS_LABEL: Record<string, { label: string; cor: string }> = {
-  pendente:  { label: 'Aguardando assinatura', cor: 'text-amber-600 bg-amber-50 border-amber-200' },
-  assinado:  { label: 'Assinado', cor: 'text-green-600 bg-green-50 border-green-200' },
-  recusado:  { label: 'Recusado', cor: 'text-red-600 bg-red-50 border-red-200' },
-  expirado:  { label: 'Expirado', cor: 'text-gray-500 bg-gray-50 border-gray-200' },
+const inp: React.CSSProperties = {
+  width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 13,
+  border: '1px solid var(--border-color)', background: 'var(--bg-page)',
+  color: 'var(--text-1)', outline: 'none', boxSizing: 'border-box',
+}
+const lbl: React.CSSProperties = {
+  display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-2)',
+  textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5,
 }
 
-export function AssinaturaModal({
-  cotacaoId, razaoSocial, contatoNome, contatoEmail,
-  assinaturaStatus, assinaturaLink, onClose, onEnviado
-}: Props) {
+export function AssinaturaModal({ cotacaoId, contatoNome, contatoEmail, assinaturaStatus, assinaturaLink, onClose, onEnviado }: Props) {
   const [email, setEmail] = useState(contatoEmail ?? '')
   const [nome, setNome] = useState(contatoNome ?? '')
   const [enviando, setEnviando] = useState(false)
@@ -34,76 +33,63 @@ export function AssinaturaModal({
 
   async function handleEnviar() {
     if (!email) { setErro('Informe o e-mail do signatário.'); return }
-    setErro('')
-    setEnviando(true)
-
+    setErro(''); setEnviando(true)
     try {
       const res = await fetch('/api/assinatura', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cotacao_id: cotacaoId,
-          signatario_email: email,
-          signatario_nome: nome,
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cotacao_id: cotacaoId, signatario_email: email, signatario_nome: nome }),
       })
-
       const data = await res.json()
-
-      if (!res.ok) {
-        setErro(data.error ?? 'Erro ao enviar para assinatura.')
-      } else {
-        setLink(data.link)
-        setEnviado(true)
-        onEnviado()
-      }
-    } catch {
-      setErro('Erro de conexão. Tente novamente.')
-    }
+      if (!res.ok) { setErro(data.error ?? 'Erro ao enviar.') }
+      else { setLink(data.link); setEnviado(true); onEnviado() }
+    } catch { setErro('Erro de conexão. Tente novamente.') }
     setEnviando(false)
   }
 
   const statusAtual = assinaturaStatus ?? (enviado ? 'pendente' : null)
-  const statusInfo = statusAtual ? STATUS_LABEL[statusAtual] : null
+  const STATUS: Record<string, { label: string; bg: string; color: string; icon: string }> = {
+    pendente: { label: 'Aguardando assinatura', bg: '#fffbeb', color: '#d97706', icon: 'ti-clock' },
+    assinado: { label: 'Documento assinado', bg: '#f0fdf4', color: '#16a34a', icon: 'ti-circle-check' },
+    recusado: { label: 'Assinatura recusada', bg: '#fef2f2', color: '#dc2626', icon: 'ti-circle-x' },
+    expirado: { label: 'Link expirado', bg: '#f8fafc', color: '#64748b', icon: 'ti-clock-off' },
+  }
+  const st = statusAtual ? STATUS[statusAtual] : null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md">
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.6)', padding: 16 }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-2">
-            <PenLine className="w-4 h-4 text-purple-600" />
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Assinatura Eletrônica</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: statusAtual === 'assinado' ? '#dcfce7' : '#f3e8ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="ti ti-signature" style={{ fontSize: 20, color: statusAtual === 'assinado' ? '#16a34a' : '#9333ea' }} aria-hidden="true" />
+            </div>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', margin: 0 }}>Assinatura digital</p>
+              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0 }}>Assinar eletronicamente o QAR</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-            <X className="w-4 h-4 text-gray-500" />
-          </button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 22, padding: 4, lineHeight: 1 }}>×</button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* Status atual se já enviado */}
-          {statusInfo && (
-            <div className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium ${statusInfo.cor}`}>
-              {statusAtual === 'assinado'
-                ? <CheckCircle className="w-4 h-4" />
-                : <PenLine className="w-4 h-4" />}
-              {statusInfo.label}
+          {/* Status atual */}
+          {st && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: st.bg, borderRadius: 8, border: `1px solid ${st.color}30` }}>
+              <i className={`ti ${st.icon}`} style={{ fontSize: 16, color: st.color }} aria-hidden="true" />
+              <span style={{ fontSize: 13, fontWeight: 500, color: st.color }}>{st.label}</span>
             </div>
           )}
 
           {/* Link de acompanhamento */}
           {link && (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-              <p className="text-xs text-gray-500 mb-2">Link do documento:</p>
-              <a
-                href={link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline break-all"
-              >
-                <ExternalLink className="w-3 h-3 flex-shrink-0" />
+            <div style={{ background: 'var(--bg-page)', borderRadius: 8, padding: '12px 14px' }}>
+              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 6px' }}>Link do documento:</p>
+              <a href={link} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 12, color: 'var(--accent)', wordBreak: 'break-all', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <i className="ti ti-external-link" style={{ fontSize: 12, flexShrink: 0 }} aria-hidden="true" />
                 {link}
               </a>
             </div>
@@ -112,77 +98,44 @@ export function AssinaturaModal({
           {/* Formulário de envio */}
           {!enviado && (
             <>
-              <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
-                <p className="text-xs text-purple-700 dark:text-purple-400 font-medium mb-1">Como funciona:</p>
-                <ol className="space-y-1">
-                  {[
-                    'O PDF do QAR é enviado automaticamente para a plataforma de assinatura configurada',
-                    'O signatário recebe um e-mail com o link para assinar digitalmente',
-                    'Após a assinatura, o status é atualizado no sistema',
-                  ].map((t, i) => (
-                    <li key={i} className="flex gap-2 text-xs text-purple-600 dark:text-purple-400">
-                      <span className="flex-shrink-0 font-medium">{i + 1}.</span>
-                      <span>{t}</span>
-                    </li>
-                  ))}
-                </ol>
+              <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 8, padding: '12px 14px' }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: '#7e22ce', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '.5px' }}>Como funciona:</p>
+                {['PDF enviado automaticamente para plataforma de assinatura', 'Signatário recebe e-mail com link para assinar', 'Status atualizado automaticamente após assinatura'].map((t, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 5 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#9333ea', flexShrink: 0 }}>{i + 1}.</span>
+                    <p style={{ fontSize: 12, color: '#7e22ce', margin: 0 }}>{t}</p>
+                  </div>
+                ))}
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1.5">Nome do signatário</label>
-                <input
-                  value={nome}
-                  onChange={e => setNome(e.target.value)}
-                  placeholder="Nome completo"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
+                <label style={lbl}>Nome do signatário</label>
+                <input value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome completo" style={inp} />
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1.5">
-                  E-mail do signatário <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => { setEmail(e.target.value); setErro('') }}
-                  placeholder="email@empresa.com.br"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
+                <label style={lbl}>E-mail do signatário *</label>
+                <input type="email" value={email} onChange={e => { setEmail(e.target.value); setErro('') }} placeholder="email@empresa.com.br" style={inp} />
               </div>
 
               {erro && (
-                <div className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2.5">
-                  <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs text-red-600 dark:text-red-400">{erro}</p>
-                    {erro.includes('configurado') && (
-                      <a href="/configuracoes" className="text-xs text-red-600 underline mt-1 inline-block">
-                        Ir para Configurações →
-                      </a>
-                    )}
-                  </div>
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 12px', display: 'flex', gap: 8 }}>
+                  <i className="ti ti-alert-circle" style={{ fontSize: 15, color: '#ef4444', flexShrink: 0 }} aria-hidden="true" />
+                  <p style={{ fontSize: 12, color: '#dc2626', margin: 0 }}>{erro}</p>
                 </div>
               )}
 
-              <button
-                onClick={handleEnviar}
-                disabled={enviando || !email}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-500 disabled:opacity-50 transition-colors"
-              >
-                {enviando
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
-                  : <><PenLine className="w-4 h-4" /> Enviar para assinatura</>}
+              <button onClick={handleEnviar} disabled={enviando || !email}
+                style={{ width: '100%', padding: 11, background: enviando || !email ? '#94a3b8' : '#9333ea', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: enviando || !email ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <i className={`ti ${enviando ? 'ti-loader-2' : 'ti-signature'}`} style={{ fontSize: 15 }} aria-hidden="true" />
+                {enviando ? 'Enviando...' : 'Enviar para assinatura'}
               </button>
             </>
           )}
 
-          {/* Reenviar se já estava enviado */}
           {enviado && statusAtual !== 'assinado' && (
-            <button
-              onClick={() => { setEnviado(false); setLink('') }}
-              className="w-full py-2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            >
+            <button onClick={() => { setEnviado(false); setLink('') }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-3)', padding: 4 }}>
               Reenviar para outro signatário
             </button>
           )}

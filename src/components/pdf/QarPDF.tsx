@@ -38,9 +38,7 @@ interface CotacaoQAR {
   embarcador_importacao?: boolean
   // Averbação
   averb_atm?: boolean
-  averb_averbnet?: boolean
   averb_ndd?: boolean
-  averb_citnet?: boolean
   averb_outro?: string | null
   averb_contato_nome?: string | null
   averb_contato_email?: string | null
@@ -227,9 +225,7 @@ export function QarPDF({
         <Secao titulo="Dados da Averbação" />
         <View style={styles.checkRow}>
           <Check checked={cotacao.averb_atm} label="AT&M" />
-          <Check checked={cotacao.averb_averbnet} label="Averbnet" />
           <Check checked={cotacao.averb_ndd} label="NDD" />
-          <Check checked={cotacao.averb_citnet} label="Citnet" />
           {cotacao.averb_outro && <Check checked label={`Outro: ${cotacao.averb_outro}`} />}
         </View>
         <Campo label="Contato averbação" value={cotacao.averb_contato_nome} />

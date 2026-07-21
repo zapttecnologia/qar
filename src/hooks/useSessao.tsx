@@ -61,7 +61,7 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
 
     // Verifica se é super admin
     const { data: sa } = await supabase
-      .from('super_admins').select('id').eq('usuario_id', user.id).single()
+      .from('super_admins').select('id').eq('usuario_id', user.id).maybeSingle()
     setIsSuperAdmin(!!sa)
 
     // Busca corretoras vinculadas

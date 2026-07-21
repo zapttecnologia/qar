@@ -1,15 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 import { useSessao } from '@/hooks/useSessao'
+import { useCotacoes } from '@/hooks/useCotacoes'
 import { criarCotacao, atualizarCotacao } from '@/lib/queries/cotacoes'
 import { salvarMercadorias, salvarPercursos } from '@/lib/queries/cotacoes'
 import { salvarTabelaFilha } from '@/lib/queries/cotacoes_qar'
 import { buscarClientePorCNPJ, criarCliente } from '@/lib/queries/clientes'
 import { buscarDadosCNPJ, formatCNPJ, validarCNPJ } from '@/lib/utils'
+import { buscarCotacao } from '@/lib/queries/cotacoes'
+import { useANTT } from '@/hooks/useANTT'
+import { BadgeANTT } from '@/components/antt/BadgeANTT'
+import { InputMercadoria } from '@/components/cotacoes/InputMercadoria'
 import type { RamoSeguro } from '@/types/database'
 
 // ── Tipos de linha das tabelas dinâmicas ─────────────────────
@@ -22,7 +27,47 @@ type LinhaGerc   = { gerenciadora: string; possui_cadastro: boolean; possui_viti
 type LinhaCondP  = { lmg: string; ramo: string; taxa: string; pos_franquia: string; premio_minimo: string }
 type LinhaSin    = { data_sinistro: string; ramo: string; local_origem: string; local_destino: string; valor_prejuizo: string }
 
-const RAMOS: RamoSeguro[] = ['RCTR-C', 'RC-DC', 'RCTA-C', 'RCT-OM', 'RCTR-VI', 'RCA-C']
+const RAMOS: RamoSeguro[] = ['RCTR-C', 'RC-DC', 'RC-V', 'RCTA-C', 'RCT-OM', 'RCTR-VI', 'RCA-C']
+
+// Seleção automática de ramos pela atividade principal (CNAE)
+const PERFIS_ATIVIDADE = [
+  {
+    cnaes: ['4930201', '4930202', '4930203', '4930204'],
+    ramos: ['RCTR-C', 'RC-DC', 'RC-V'] as RamoSeguro[],
+    rotulo: 'Transportadora rodoviária',
+    modal: 'terrestre' as const,
+  },
+  {
+    // 5120-0/00 carga · 5111-1/00 e 5112-9/xx passageiros (transportam carga em porão)
+    cnaes: ['5120000', '5111100', '5112901', '5112999'],
+    ramos: ['RCA-C', 'RCTA-C', 'RCTR-VI'] as RamoSeguro[],
+    rotulo: 'Transportadora aérea',
+    modal: 'aereo' as const,
+  },
+  {
+    // 4911-6/00 Transporte ferroviário de carga
+    cnaes: ['4911600'],
+    ramos: ['RCT-OM'] as RamoSeguro[],
+    rotulo: 'Transportadora ferroviária',
+    modal: 'ferroviario' as const,
+  },
+  {
+    // 5011-4/02 cabotagem · 5012-2/02 longo curso · 5021-1/02 e 5022-0/02 navegação interior — todos carga
+    cnaes: ['5011402', '5012202', '5021102', '5022002'],
+    ramos: ['RCA-C'] as RamoSeguro[],
+    rotulo: 'Transportadora aquaviária',
+    modal: 'aquaviario' as const,
+  },
+]
+
+function perfilPorAtividade(atividade: string) {
+  const cnae = (atividade ?? '').replace(/\D/g, '').slice(0, 7)
+  return PERFIS_ATIVIDADE.find(p => p.cnaes.includes(cnae)) ?? null
+}
+
+function listar(ramos: string[]) {
+  return ramos.join(', ').replace(/, ([^,]*)$/, ' e $1')
+}
 const ETAPAS = ['Cadastro', 'Ramos', 'Operação', 'Histórico', 'Riscos', 'Condições']
 
 // ── Componentes de apoio ─────────────────────────────────────
@@ -117,10 +162,15 @@ export default function NovaCotacaoPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { corretora } = useSessao()
+  const cota = useCotacoes()
+  const antt = useANTT()
   const [etapa, setEtapa] = useState(1)
   const [salvando, setSalvando] = useState(false)
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false)
   const [cnpjStatus, setCnpjStatus] = useState<'idle' | 'ok' | 'error'>('idle')
+
+  const editarId = searchParams.get('editar')
+  const modoEdicao = !!editarId
 
   // ── Estado: Etapa 1 — Cadastro ──────────────────────────────
   const [cnpj, setCnpj] = useState('')
@@ -146,9 +196,7 @@ export default function NovaCotacaoPage() {
   const [percursos, setPercursos] = useState<LinhaPerc[]>([{ origem: '', destino: '', percentual: 0 }])
   // Averbação
   const [avAtm, setAvAtm] = useState(false)
-  const [avAverbnet, setAvAverbnet] = useState(false)
   const [avNdd, setAvNdd] = useState(false)
-  const [avCitnet, setAvCitnet] = useState(false)
   const [avOutro, setAvOutro] = useState('')
   const [avContatoNome, setAvContatoNome] = useState('')
   const [avContatoEmail, setAvContatoEmail] = useState('')
@@ -189,6 +237,50 @@ export default function NovaCotacaoPage() {
   const [assLocal, setAssLocal] = useState('')
   const [assData, setAssData] = useState('')
 
+  // ── Carrega dados ao editar cotação existente ────────────────
+  useEffect(() => {
+    if (!editarId) return
+    buscarCotacao(editarId).then(cotacao => {
+      if (!cotacao) return
+      const c = cotacao as Record<string, unknown>
+      setCnpj(formatCNPJ((c.cnpj as string) ?? ''))
+      setDadosCadastro({
+        razao_social: (c.razao_social as string) ?? '',
+        nome_fantasia: (c.nome_fantasia as string) ?? '',
+        atividade_principal: (c.atividade_principal as string) ?? '',
+        endereco: (c.endereco as string) ?? '',
+        cep: (c.cep as string) ?? '',
+        cidade_uf: (c.cidade_uf as string) ?? '',
+        site: (c.site as string) ?? '',
+        antt: (c.antt as string) ?? '',
+        contato_nome: (c.contato_nome as string) ?? '',
+        contato_email: (c.contato_email as string) ?? '',
+        contato_telefone: (c.contato_telefone as string) ?? '',
+        filial: (c.filial as string) ?? '',
+        corretor_nome: (c.corretor_nome as string) ?? '',
+      })
+      setClienteId((c.cliente_id as string) ?? null)
+      setCnpjStatus('ok')
+      if (c.ramo) setRamosSel([c.ramo as string])
+      setEmbTN(!!(c.embarcador_tn))
+      setEmbExp(!!(c.embarcador_exportacao))
+      setEmbImp(!!(c.embarcador_importacao))
+      setPctTerrestre(Number(c.pct_terrestre ?? 0))
+      setPctAereo(Number(c.pct_aereo ?? 0))
+      setPctAquaviario(Number(c.pct_aquaviario ?? 0))
+      setPctFerroviario(Number(c.pct_ferroviario ?? 0))
+      setQtdEmbarques(String(c.qtd_embarques_mes ?? ''))
+      setVlrMedio(String(c.valor_medio_embarque ?? ''))
+      setVlrMaximo(String(c.valor_maximo_embarque ?? ''))
+      setVlrTotal(String(c.importancia_segurada ?? ''))
+      // frota — campos não implementados ainda, ignorar
+      // setFrota(c.qtd_frota_propria)
+      // setFrotaTerc(c.qtd_frota_terceiros)
+      // setFrotaAgre(c.qtd_frota_agregados)
+      // histórico — campos extras carregados separadamente
+    }).catch(console.error)
+  }, [editarId])
+
   // ── Busca CNPJ ──────────────────────────────────────────────
   async function handleBuscarCNPJ() {
     if (!validarCNPJ(cnpj)) return
@@ -216,26 +308,57 @@ export default function NovaCotacaoPage() {
         })
         setCnpjStatus('ok')
         setBuscandoCNPJ(false)
+        // Consulta ANTT mesmo para clientes existentes (status pode ter mudado)
+        antt.consultar(cnpj)
+        // Seleção automática de ramos por CNAE do cliente existente
+        aplicarPerfilAtividade(clienteExistente.atividade_principal ?? '')
         return
       }
 
-      // Busca na Receita Federal
-      const dados = await buscarDadosCNPJ(cnpj)
-      setDadosCadastro(p => ({
-        ...p,
-        razao_social: dados.razao_social ?? '',
-        nome_fantasia: dados.nome_fantasia ?? '',
-        atividade_principal: `${dados.cnae_fiscal} – ${dados.cnae_fiscal_descricao}`,
-        endereco: [dados.logradouro, dados.numero, dados.complemento, dados.bairro].filter(Boolean).join(', '),
-        cep: (dados.cep ?? '').replace(/^(\d{5})(\d{3})$/, '$1-$2'),
-        cidade_uf: `${dados.municipio} / ${dados.uf}`,
-      }))
-      setClienteId(null) // novo cliente, será criado ao salvar
+      // 1. Receita Federal — BrasilAPI (gratuita, dados completos)
+      try {
+        const dados = await buscarDadosCNPJ(cnpj)
+        const atividadeTexto = `${dados.cnae_fiscal} – ${dados.cnae_fiscal_descricao}`
+        setDadosCadastro(p => ({
+          ...p,
+          razao_social: dados.razao_social ?? '',
+          nome_fantasia: dados.nome_fantasia ?? '',
+          atividade_principal: atividadeTexto,
+          endereco: [dados.logradouro, dados.numero, dados.complemento, dados.bairro].filter(Boolean).join(', '),
+          cep: (dados.cep ?? '').replace(/^(\d{5})(\d{3})$/, '$1-$2'),
+          cidade_uf: `${dados.municipio} / ${dados.uf}`,
+        }))
+        // Seleção automática de ramos por CNAE
+        aplicarPerfilAtividade(atividadeTexto)
+      } catch { /* ignora */ }
+
+      // 2. ANTT — OpenCheck (pago, só RNTRC e status)
+      antt.consultar(cnpj).then(r => {
+        if (r?.rntrc) setDadosCadastro(p => ({ ...p, antt: r.rntrc ?? p.antt }))
+      })
+
+      setClienteId(null)
       setCnpjStatus('ok')
     } catch {
       setCnpjStatus('error')
     }
     setBuscandoCNPJ(false)
+  }
+
+  // Seleciona os ramos e o modal correspondentes à atividade principal.
+  // mesclar = mantém o que o usuário já marcou (usado na digitação manual).
+  function aplicarPerfilAtividade(atividade: string, mesclar = false) {
+    const perfil = perfilPorAtividade(atividade)
+    if (!perfil) return null
+    setRamosSel(prev => (mesclar ? [...new Set([...prev, ...perfil.ramos])] : [...perfil.ramos]))
+    const setPct = {
+      terrestre:   setPctTerrestre,
+      aereo:       setPctAereo,
+      aquaviario:  setPctAquaviario,
+      ferroviario: setPctFerroviario,
+    }[perfil.modal]
+    setPct(atual => (mesclar && atual ? atual : 100))
+    return perfil
   }
 
   function toggleRamo(r: string) {
@@ -274,7 +397,40 @@ export default function NovaCotacaoPage() {
         cId = novoCliente.id
       }
 
-      // 2. Criar cotação principal
+      // 2. Criar OU atualizar cotação
+      let coid: string
+      if (modoEdicao && editarId) {
+        // Modo edição — atualiza cotação existente
+        coid = editarId
+        await atualizarCotacao(coid, {
+          cnpj,
+          razao_social: dadosCadastro.razao_social,
+          nome_fantasia: dadosCadastro.nome_fantasia || undefined,
+          atividade_principal: dadosCadastro.atividade_principal || undefined,
+          endereco: dadosCadastro.endereco || undefined,
+          cep: dadosCadastro.cep || undefined,
+          cidade_uf: dadosCadastro.cidade_uf || undefined,
+          site: dadosCadastro.site || undefined,
+          antt: dadosCadastro.antt || undefined,
+          contato_nome: dadosCadastro.contato_nome || undefined,
+          contato_email: dadosCadastro.contato_email || undefined,
+          contato_telefone: dadosCadastro.contato_telefone || undefined,
+          ramo: (ramosSel[0] as RamoSeguro) ?? 'RCTR-C',
+          pct_terrestre: pctTerrestre,
+          pct_aereo: pctAereo,
+          pct_aquaviario: pctAquaviario,
+          pct_ferroviario: pctFerroviario,
+          qtd_embarques_mes: qtdEmbarques ? Number(qtdEmbarques) : undefined,
+          valor_medio_embarque: vlrMedio ? Number(vlrMedio) : undefined,
+          valor_maximo_embarque: vlrMaximo ? Number(vlrMaximo) : undefined,
+          importancia_segurada: vlrTotal ? Number(vlrTotal) : undefined,
+          pct_frota: pctFrota,
+          pct_transportadoras: pctTransp,
+          pct_agregado: pctAgregado,
+          pct_autonomo: pctAutonomo,
+        } as never)
+      } else {
+      // Modo criação — nova cotação
       const cotacao = await criarCotacao({
         corretora_id: corretora.id,
         cnpj,
@@ -306,7 +462,8 @@ export default function NovaCotacaoPage() {
         pct_autonomo: pctAutonomo,
       })
 
-      const coid = (cotacao as Record<string, unknown>).id as string
+      coid = (cotacao as Record<string, unknown>).id as string
+      } // fim else modo criação
 
       // 3. Atualizar campos extras (ramos múltiplos, averbação, sinistros, etc.)
       await atualizarCotacao(coid, {
@@ -316,9 +473,7 @@ export default function NovaCotacaoPage() {
         embarcador_exportacao: embExp as never,
         embarcador_importacao: embImp as never,
         averb_atm: avAtm as never,
-        averb_averbnet: avAverbnet as never,
         averb_ndd: avNdd as never,
-        averb_citnet: avCitnet as never,
         averb_outro: avOutro as never,
         averb_contato_nome: avContatoNome as never,
         averb_contato_email: avContatoEmail as never,
@@ -380,13 +535,48 @@ export default function NovaCotacaoPage() {
   )
 
   // ── Render ───────────────────────────────────────────────────
+  // Bloqueio por limite de cotações
+  if (!cota.carregando && !cota.pode) {
+    return (
+      <div style={{ maxWidth: 500, margin: '80px auto', padding: 20, textAlign: 'center' }}>
+        <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#2d0e0e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <i className="ti ti-lock" style={{ fontSize: 26, color: '#f85149' }} aria-hidden="true" />
+        </div>
+        <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-1)', margin: '0 0 10px' }}>
+          {cota.motivo === 'plano_vencido' ? 'Trial encerrado' : 'Limite de cotações atingido'}
+        </h2>
+        <p style={{ fontSize: 14, color: 'var(--text-2)', margin: '0 0 8px', lineHeight: 1.6 }}>
+          {cota.mensagem}
+        </p>
+        {cota.limite && (
+          <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 24px' }}>
+            {cota.usadas} de {cota.limite} cotações usadas este mês
+          </p>
+        )}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <button onClick={() => router.push('/cotacoes')}
+            style={{ padding: '9px 18px', background: 'none', border: '1px solid var(--border-color)', borderRadius: 6, color: 'var(--text-2)', fontSize: 13, cursor: 'pointer' }}>
+            Voltar
+          </button>
+          <button onClick={() => router.push('/configuracoes')}
+            style={{ padding: '9px 18px', background: '#f85149', border: 'none', borderRadius: 6, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            Fazer upgrade
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: 20, maxWidth: 760, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <button onClick={() => router.push("/cotacoes")} style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid var(--border-color)", background: "var(--bg-card)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-2)" }}>
+        <button onClick={() => modoEdicao ? router.push(`/cotacoes/${editarId}`) : router.push("/cotacoes")} style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid var(--border-color)", background: "var(--bg-card)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-2)" }}>
           <i className="ti ti-arrow-left" style={{ fontSize: 15 }} />
         </button>
-        <h1 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-1)" }}>Nova cotação</h1>
+        <div>
+          <h1 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-1)" }}>{modoEdicao ? 'Editar cotação' : 'Nova cotação'}</h1>
+          <p style={{ fontSize: 12, color: "var(--text-3)", marginTop: 2 }}>{modoEdicao ? 'Altere os dados e salve' : 'Preencha os dados do questionário'}</p>
+        </div>
       </div>
 
       <StepHeader etapa={etapa} total={ETAPAS.length} />
@@ -421,23 +611,55 @@ export default function NovaCotacaoPage() {
                 <Input value={dadosCadastro.razao_social} onChange={v => setC('razao_social', v)} />
               </div>
               <div><Label>Nome fantasia</Label><Input value={dadosCadastro.nome_fantasia} onChange={v => setC('nome_fantasia', v)} /></div>
-              <div><Label>Atividade principal</Label><Input value={dadosCadastro.atividade_principal} onChange={v => setC('atividade_principal', v)} /></div>
+              <div>
+                <Label>Atividade principal</Label>
+                <Input value={dadosCadastro.atividade_principal} onChange={v => {
+                  setC('atividade_principal', v)
+                  // Seleção automática de ramos conforme o modal da atividade
+                  aplicarPerfilAtividade(v, true)
+                }} />
+                {(() => {
+                  const perfil = perfilPorAtividade(dadosCadastro.atividade_principal)
+                  if (!perfil) return null
+                  return (
+                    <p style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <i className="ti ti-check" style={{ fontSize: 12 }} aria-hidden="true" />
+                      {perfil.rotulo} — {listar(perfil.ramos)} selecionados automaticamente
+                    </p>
+                  )
+                })()}
+              </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 <Label>Endereço</Label><Input value={dadosCadastro.endereco} onChange={v => setC('endereco', v)} />
               </div>
               <div><Label>CEP</Label><Input value={dadosCadastro.cep} onChange={v => setC('cep', v)} /></div>
               <div><Label>Cidade / UF</Label><Input value={dadosCadastro.cidade_uf} onChange={v => setC('cidade_uf', v)} /></div>
               <div><Label>Site</Label><Input value={dadosCadastro.site} onChange={v => setC('site', v)} /></div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <label className="field-label" style={{ margin: 0 }}>ANTT / RNTRC</label>
-                  <button type="button"
-                    onClick={() => { const d = cnpj.replace(/\D/g, ''); window.open(`https://consultapublica.antt.gov.br/Site/ConsultaRNTRC.aspx${d ? `?documento=${d}` : ''}`, '_blank', 'noopener,noreferrer') }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                    <i className="ti ti-external-link" style={{ fontSize: 12 }} /> Consultar ANTT
-                  </button>
+                  <BadgeANTT
+                    resultado={antt.resultado}
+                    consultando={antt.consultando}
+                    pendente={antt.pendente}
+                    erro={antt.erro}
+                    onConsultar={() => antt.consultar(cnpj)}
+                    compact
+                  />
                 </div>
-                <Input value={dadosCadastro.antt} onChange={v => setC('antt', v)} placeholder="Nº RNTRC" />
+                <Input value={dadosCadastro.antt} onChange={v => setC('antt', v)} placeholder="Nº RNTRC (preenchido automaticamente)" />
+                {/* Badge completo com detalhes */}
+                {(antt.resultado || antt.erro) && !antt.consultando && (
+                  <div style={{ marginTop: 8 }}>
+                    <BadgeANTT
+                      resultado={antt.resultado}
+                      consultando={false}
+                      pendente={antt.pendente}
+                      erro={antt.erro}
+                      onConsultar={() => antt.consultar(cnpj)}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -486,6 +708,33 @@ export default function NovaCotacaoPage() {
               </div>
             </div>
 
+            {/* Averbação */}
+            <div>
+              <p className="section-heading">Dados da averbação</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
+                {[['AT&M', avAtm, setAvAtm], ['NDD', avNdd, setAvNdd]].map(([lbl, val, set]) => (
+                  <label key={lbl as string} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-1)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={val as boolean} onChange={e => (set as (v: boolean) => void)(e.target.checked)} style={{ width: 15, height: 15, cursor: "pointer" }} />
+                    {lbl as string}
+                  </label>
+                ))}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-1)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={!!avOutro} onChange={e => !e.target.checked && setAvOutro('')} style={{ width: 15, height: 15, cursor: "pointer" }} />
+                    Outro:
+                  </label>
+                  <input value={avOutro} onChange={e => setAvOutro(e.target.value)} placeholder="Especificar"
+                    className="field-input" style={{ width: 110, fontSize: 12 }} />
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                <div><Label>Contato — Nome</Label><Input value={avContatoNome} onChange={setAvContatoNome} /></div>
+                <div><Label>E-mail</Label><Input value={avContatoEmail} onChange={setAvContatoEmail} type="email" /></div>
+                <div><Label>Telefone</Label><Input value={avContatoTel} onChange={setAvContatoTel} /></div>
+                <div style={{ gridColumn: "1 / -1" }}><Label>E-mail para envio da fatura</Label><Input value={avEmailFatura} onChange={setAvEmailFatura} type="email" /></div>
+              </div>
+            </div>
+
             {/* Tipos de transporte */}
             <div>
               <p className="section-heading">Tipos de transporte (%)</p>
@@ -510,16 +759,24 @@ export default function NovaCotacaoPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {mercadorias.map((m, i) => (
                   <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <input value={m.tipo} onChange={e => setMercadorias(p => p.map((x, j) => j === i ? { ...x, tipo: e.target.value } : x))}
-                      placeholder="Tipo de mercadoria" className="field-input" style={{ fontSize: 12 }} />
+                    <InputMercadoria value={m.tipo}
+                      onChange={v => setMercadorias(p => p.map((x, j) => j === i ? { ...x, tipo: v } : x))} />
                     <input value={m.embarcador} onChange={e => setMercadorias(p => p.map((x, j) => j === i ? { ...x, embarcador: e.target.value } : x))}
                       placeholder="Embarcador" className="field-input" style={{ fontSize: 12 }} />
-                    <input type="number" value={m.percentual} onChange={e => setMercadorias(p => p.map((x, j) => j === i ? { ...x, percentual: Number(e.target.value) } : x))}
-                      placeholder="%" className="field-input" style={{ width: 60, textAlign: "right", fontSize: 12 }} />
+                    <input type="number" min={0} max={100} value={m.percentual}
+                      onChange={e => setMercadorias(p => {
+                        // Limita ao que ainda falta para 100% considerando as demais linhas
+                        const outras = p.reduce((s, x, j) => (j === i ? s : s + (x.percentual || 0)), 0)
+                        const val = Math.max(0, Math.min(Number(e.target.value) || 0, 100 - outras))
+                        return p.map((x, j) => (j === i ? { ...x, percentual: val } : x))
+                      })}
+                      placeholder="0" className="field-input" style={{ width: 60, textAlign: "right", fontSize: 12 }} />
+                    <span style={{ fontSize: 12, color: "var(--text-3)" }}>%</span>
                     <DelBtn onClick={() => setMercadorias(p => p.filter((_, j) => j !== i))} />
                   </div>
                 ))}
                 <TableAddBtn onClick={() => setMercadorias(p => [...p, { tipo: '', embarcador: '', percentual: 0 }])} />
+                <PctTotal campos={mercadorias.map(m => m.percentual)} />
               </div>
             </div>
 
@@ -540,33 +797,6 @@ export default function NovaCotacaoPage() {
                 ))}
                 <TableAddBtn onClick={() => setPercursos(p => [...p, { origem: '', destino: '', percentual: 0 }])} />
                 <PctTotal campos={percursos.map(p => p.percentual)} />
-              </div>
-            </div>
-
-            {/* Averbação */}
-            <div>
-              <p className="section-heading">Dados da averbação</p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
-                {[['AT&M', avAtm, setAvAtm], ['Averbnet', avAverbnet, setAvAverbnet], ['NDD', avNdd, setAvNdd], ['Citnet', avCitnet, setAvCitnet]].map(([lbl, val, set]) => (
-                  <label key={lbl as string} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-1)", cursor: "pointer" }}>
-                    <input type="checkbox" checked={val as boolean} onChange={e => (set as (v: boolean) => void)(e.target.checked)} style={{ width: 15, height: 15, cursor: "pointer" }} />
-                    {lbl as string}
-                  </label>
-                ))}
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-1)", cursor: "pointer" }}>
-                    <input type="checkbox" checked={!!avOutro} onChange={e => !e.target.checked && setAvOutro('')} style={{ width: 15, height: 15, cursor: "pointer" }} />
-                    Outro:
-                  </label>
-                  <input value={avOutro} onChange={e => setAvOutro(e.target.value)} placeholder="Especificar"
-                    className="field-input" style={{ width: 110, fontSize: 12 }} />
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                <div><Label>Contato — Nome</Label><Input value={avContatoNome} onChange={setAvContatoNome} /></div>
-                <div><Label>E-mail</Label><Input value={avContatoEmail} onChange={setAvContatoEmail} type="email" /></div>
-                <div><Label>Telefone</Label><Input value={avContatoTel} onChange={setAvContatoTel} /></div>
-                <div style={{ gridColumn: "1 / -1" }}><Label>E-mail para envio da fatura</Label><Input value={avEmailFatura} onChange={setAvEmailFatura} type="email" /></div>
               </div>
             </div>
 
