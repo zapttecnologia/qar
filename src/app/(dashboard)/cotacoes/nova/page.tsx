@@ -188,6 +188,9 @@ export default function NovaCotacaoPage() {
   const [salvoEm, setSalvoEm] = useState<string | null>(null)
   const ultimoSalvoRef = useRef<string | null>(null)
   const emVooRef = useRef(false)
+  // Última versão gravada de cada tabela filha. Como salvá-las faz delete + insert
+  // na tabela inteira, só reescrevemos as seções que realmente mudaram.
+  const filhasRef = useRef<Record<string, string>>({})
 
   // ── Estado: Etapa 1 — Cadastro ──────────────────────────────
   const [cnpj, setCnpj] = useState('')
@@ -505,6 +508,16 @@ export default function NovaCotacaoPage() {
     })
   }
 
+  // Grava uma tabela filha só se o conteúdo mudou desde a última gravação.
+  // A marca é registrada depois do sucesso: se a escrita falhar, a próxima
+  // tentativa reescreve a seção em vez de considerá-la salva.
+  async function gravarFilhaSeMudou(chave: string, dados: unknown[], gravar: () => Promise<unknown>) {
+    const atual = JSON.stringify(dados)
+    if (filhasRef.current[chave] === atual) return
+    await gravar()
+    filhasRef.current[chave] = atual
+  }
+
   // ── Salvar tudo ─────────────────────────────────────────────
   // Usada pelo botão Salvar (redirecionar = true) e pelo autosave (false).
   // No autosave o erro é propagado para o chamador marcar o status, em vez de alertar.
@@ -632,20 +645,31 @@ export default function NovaCotacaoPage() {
         assinatura_data: assData || null as never,
       } as never)
 
-      // 4. Salvar tabelas filhas
+      // 4. Salvar tabelas filhas — apenas as seções alteradas.
+      // A comparação usa o payload já filtrado, o mesmo que iria para o banco,
+      // então digitar numa linha em branco que seria descartada não gera escrita.
+      const merc = mercadorias.filter(m => m.tipo)
+      const perc = percursos.filter(p => p.origem && p.destino)
+      const exp = expAnterior.filter(e => e.seguradora)
+        .map(e => ({ ...e, premio_pago: e.premio_pago ? Number(e.premio_pago) : null }))
+      const cond = condicaoAtual.filter(c => c.lmg || c.ramo)
+        .map(c => ({ ...c, premio_minimo: c.premio_minimo ? Number(c.premio_minimo) : null }))
+      const sin = sinistros.filter(s => s.data_sinistro || s.ramo)
+        .map(s => ({ ...s, valor_prejuizo: s.valor_prejuizo ? Number(s.valor_prejuizo) : null }))
+      const ddr = ddrs.filter(d => d.embarcador || d.seguradora)
+      const ger = gerenciadoras.filter(g => g.gerenciadora)
+      const cpre = condPretendidas.filter(c => c.lmg || c.ramo)
+        .map(c => ({ ...c, premio_minimo: c.premio_minimo ? Number(c.premio_minimo) : null }))
+
       await Promise.all([
-        salvarMercadorias(coid, mercadorias.filter(m => m.tipo)),
-        salvarPercursos(coid, percursos.filter(p => p.origem && p.destino)),
-        salvarTabelaFilha('cotacao_experiencia_anterior', coid,
-          expAnterior.filter(e => e.seguradora).map(e => ({ ...e, premio_pago: e.premio_pago ? Number(e.premio_pago) : null }))),
-        salvarTabelaFilha('cotacao_condicao_atual', coid,
-          condicaoAtual.filter(c => c.lmg || c.ramo).map(c => ({ ...c, premio_minimo: c.premio_minimo ? Number(c.premio_minimo) : null }))),
-        salvarTabelaFilha('cotacao_sinistros', coid,
-          sinistros.filter(s => s.data_sinistro || s.ramo).map(s => ({ ...s, valor_prejuizo: s.valor_prejuizo ? Number(s.valor_prejuizo) : null, local_origem: s.local_origem, local_destino: s.local_destino }))),
-        salvarTabelaFilha('cotacao_ddrs', coid, ddrs.filter(d => d.embarcador || d.seguradora)),
-        salvarTabelaFilha('cotacao_gerenciadoras', coid, gerenciadoras.filter(g => g.gerenciadora)),
-        salvarTabelaFilha('cotacao_condicoes_pretendidas', coid,
-          condPretendidas.filter(c => c.lmg || c.ramo).map(c => ({ ...c, premio_minimo: c.premio_minimo ? Number(c.premio_minimo) : null }))),
+        gravarFilhaSeMudou('mercadorias', merc, () => salvarMercadorias(coid, merc)),
+        gravarFilhaSeMudou('percursos', perc, () => salvarPercursos(coid, perc)),
+        gravarFilhaSeMudou('experiencia', exp, () => salvarTabelaFilha('cotacao_experiencia_anterior', coid, exp)),
+        gravarFilhaSeMudou('condicaoAtual', cond, () => salvarTabelaFilha('cotacao_condicao_atual', coid, cond)),
+        gravarFilhaSeMudou('sinistros', sin, () => salvarTabelaFilha('cotacao_sinistros', coid, sin)),
+        gravarFilhaSeMudou('ddrs', ddr, () => salvarTabelaFilha('cotacao_ddrs', coid, ddr)),
+        gravarFilhaSeMudou('gerenciadoras', ger, () => salvarTabelaFilha('cotacao_gerenciadoras', coid, ger)),
+        gravarFilhaSeMudou('condPretendidas', cpre, () => salvarTabelaFilha('cotacao_condicoes_pretendidas', coid, cpre)),
       ])
 
       if (redirecionar) router.push(`/cotacoes/${coid}`)
