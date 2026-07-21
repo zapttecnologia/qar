@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 const BASE_AUTH = 'https://opencheck.arkeyva.com'
 const BASE_API  = 'https://opencheck.arkeyva.com/api/datas'
@@ -11,6 +12,12 @@ const FIELD_CNPJ_ANTT   = '660b03c1ab35f6688e9b7d0d'
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 export async function POST(request: NextRequest) {
+  // Rota de depuração: cada chamada dispara uma consulta paga na OpenCheck,
+  // portanto exige sessão autenticada igual à rota /api/antt.
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+
   const { cnpj } = await request.json()
   const cnpjLimpo = cnpj.replace(/\D/g, '')
   const cnpjMask  = cnpjLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')

@@ -47,8 +47,10 @@ export function InputMercadoria({ value, onChange, placeholder = 'Tipo de mercad
     }
   }
 
+  // width:100% + flex-basis auto reproduz o dimensionamento do <input> que havia aqui,
+  // para o campo dividir a linha igualmente com o de Embarcador
   return (
-    <div ref={boxRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+    <div ref={boxRef} style={{ position: 'relative', width: '100%', minWidth: 0 }}>
       <input
         value={value}
         onChange={e => { onChange(e.target.value); setAberto(true); setDestaque(0) }}

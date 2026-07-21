@@ -8,7 +8,7 @@ import { useSessao } from '@/hooks/useSessao'
 import { useCotacoes } from '@/hooks/useCotacoes'
 import { criarCotacao, atualizarCotacao } from '@/lib/queries/cotacoes'
 import { salvarMercadorias, salvarPercursos } from '@/lib/queries/cotacoes'
-import { salvarTabelaFilha } from '@/lib/queries/cotacoes_qar'
+import { salvarTabelaFilha, buscarTabelasFilhas } from '@/lib/queries/cotacoes_qar'
 import { buscarClientePorCNPJ, criarCliente } from '@/lib/queries/clientes'
 import { buscarDadosCNPJ, formatCNPJ, validarCNPJ } from '@/lib/utils'
 import { buscarCotacao } from '@/lib/queries/cotacoes'
@@ -64,6 +64,9 @@ function perfilPorAtividade(atividade: string) {
   const cnae = (atividade ?? '').replace(/\D/g, '').slice(0, 7)
   return PERFIS_ATIVIDADE.find(p => p.cnaes.includes(cnae)) ?? null
 }
+
+// Os inputs do formulário são todos de texto; o banco devolve string | number | null.
+const txt = (v: unknown) => (v === null || v === undefined ? '' : String(v))
 
 function listar(ramos: string[]) {
   return ramos.join(', ').replace(/, ([^,]*)$/, ' e $1')
@@ -261,7 +264,10 @@ export default function NovaCotacaoPage() {
       })
       setClienteId((c.cliente_id as string) ?? null)
       setCnpjStatus('ok')
-      if (c.ramo) setRamosSel([c.ramo as string])
+      // Ramos múltiplos: a coluna `ramos` é a fonte de verdade;
+      // `ramo` (singular) é só o principal, usado como fallback em cotações antigas.
+      const ramos = Array.isArray(c.ramos) ? (c.ramos as string[]).filter(Boolean) : []
+      setRamosSel(ramos.length ? ramos : c.ramo ? [c.ramo as string] : [])
       setEmbTN(!!(c.embarcador_tn))
       setEmbExp(!!(c.embarcador_exportacao))
       setEmbImp(!!(c.embarcador_importacao))
@@ -269,15 +275,77 @@ export default function NovaCotacaoPage() {
       setPctAereo(Number(c.pct_aereo ?? 0))
       setPctAquaviario(Number(c.pct_aquaviario ?? 0))
       setPctFerroviario(Number(c.pct_ferroviario ?? 0))
-      setQtdEmbarques(String(c.qtd_embarques_mes ?? ''))
-      setVlrMedio(String(c.valor_medio_embarque ?? ''))
-      setVlrMaximo(String(c.valor_maximo_embarque ?? ''))
-      setVlrTotal(String(c.importancia_segurada ?? ''))
-      // frota — campos não implementados ainda, ignorar
-      // setFrota(c.qtd_frota_propria)
-      // setFrotaTerc(c.qtd_frota_terceiros)
-      // setFrotaAgre(c.qtd_frota_agregados)
-      // histórico — campos extras carregados separadamente
+
+      // Averbação
+      setAvAtm(!!(c.averb_atm))
+      setAvNdd(!!(c.averb_ndd))
+      setAvOutro(txt(c.averb_outro))
+      setAvContatoNome(txt(c.averb_contato_nome))
+      setAvContatoEmail(txt(c.averb_contato_email))
+      setAvContatoTel(txt(c.averb_contato_telefone))
+      setAvEmailFatura(txt(c.averb_email_fatura))
+
+      // Operação
+      setQtdEmbarques(txt(c.qtd_embarques_mes))
+      setVlrMedio(txt(c.valor_medio_embarque))
+      setVlrMaximo(txt(c.valor_maximo_embarque))
+      setVlrTotal(txt(c.importancia_segurada))
+      setObsSazonalidade(txt(c.obs_sazonalidade))
+      setDetalhesOp(txt(c.detalhes_operacao))
+      setPctFrota(Number(c.pct_frota ?? 0))
+      setPctTransp(Number(c.pct_transportadoras ?? 0))
+      setPctAgregado(Number(c.pct_agregado ?? 0))
+      setPctAutonomo(Number(c.pct_autonomo ?? 0))
+
+      // Histórico
+      setSinPeriodo(txt(c.sinistros_periodo))
+      setSinDetalhes(txt(c.sinistros_detalhes))
+
+      // Gerenciamento de riscos
+      setRastrFornecedor(txt(c.gerenc_rastreador_fornecedor))
+      setRastrTipo(txt(c.gerenc_rastreador_tipo))
+      setGerencDetalhes(txt(c.gerenc_detalhes))
+
+      // Condições
+      setCondParticulares(txt(c.condicoes_particulares))
+      setAssLocal(txt(c.assinatura_local))
+      setAssData(txt(c.assinatura_data).slice(0, 10))
+    }).catch(console.error)
+
+    // Tabelas filhas — sem isso, salvar uma edição apagaria todas elas
+    buscarTabelasFilhas(editarId).then(f => {
+      if (f.mercadorias.length) setMercadorias(f.mercadorias.map(r => {
+        const m = r as Record<string, unknown>
+        return { tipo: txt(m.tipo), embarcador: txt(m.embarcador), percentual: Number(m.percentual ?? 0) }
+      }))
+      if (f.percursos.length) setPercursos(f.percursos.map(r => {
+        const p = r as Record<string, unknown>
+        return { origem: txt(p.origem), destino: txt(p.destino), percentual: Number(p.percentual ?? 0) }
+      }))
+      if (f.experiencia.length) setExpAnterior(f.experiencia.map(r => {
+        const e = r as Record<string, unknown>
+        return { seguradora: txt(e.seguradora), corretor: txt(e.corretor), ramo: txt(e.ramo), vigencia: txt(e.vigencia), premio_pago: txt(e.premio_pago) }
+      }))
+      if (f.condicaoAtual.length) setCondicaoAtual(f.condicaoAtual.map(r => {
+        const c2 = r as Record<string, unknown>
+        return { lmg: txt(c2.lmg), ramo: txt(c2.ramo), taxa: txt(c2.taxa), pos: txt(c2.pos), premio_minimo: txt(c2.premio_minimo) }
+      }))
+      if (f.sinistros.length) setSinistros(f.sinistros.map(r => {
+        const s = r as Record<string, unknown>
+        return { data_sinistro: txt(s.data_sinistro).slice(0, 10), ramo: txt(s.ramo), local_origem: txt(s.local_origem), local_destino: txt(s.local_destino), valor_prejuizo: txt(s.valor_prejuizo) }
+      }))
+      if (f.ddrs.length) setDdrs(f.ddrs.map(r => {
+        const d = r as Record<string, unknown>
+        return { embarcador: txt(d.embarcador), seguradora: txt(d.seguradora), lmg: txt(d.lmg), vigencia: txt(d.vigencia) }
+      }))
+      if (f.gerenciadoras.length) setGerenciadoras(f.gerenciadoras.map(r => {
+        const g = r as Record<string, unknown>
+        return { gerenciadora: txt(g.gerenciadora), possui_cadastro: !!g.possui_cadastro, possui_vitimologia: !!g.possui_vitimologia, possui_monitoramento: !!g.possui_monitoramento }
+      }))
+      if (f.condPretendidas.length) setCondPretendidas(f.condPretendidas.map(r => {
+        const c3 = r as Record<string, unknown>
+        return { lmg: txt(c3.lmg), ramo: txt(c3.ramo), taxa: txt(c3.taxa), pos_franquia: txt(c3.pos_franquia), premio_minimo: txt(c3.premio_minimo) }
+      }))
     }).catch(console.error)
   }, [editarId])
 
@@ -479,6 +547,8 @@ export default function NovaCotacaoPage() {
         averb_contato_email: avContatoEmail as never,
         averb_contato_telefone: avContatoTel as never,
         averb_email_fatura: avEmailFatura as never,
+        obs_sazonalidade: obsSazonalidade as never,
+        detalhes_operacao: detalhesOp as never,
         sinistros_periodo: sinPeriodo as never,
         sinistros_detalhes: sinDetalhes as never,
         condicoes_particulares: condParticulares as never,
