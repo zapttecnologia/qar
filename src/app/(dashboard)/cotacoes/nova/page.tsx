@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -175,6 +175,20 @@ export default function NovaCotacaoPage() {
   const editarId = searchParams.get('editar')
   const modoEdicao = !!editarId
 
+  // ── Autosave ────────────────────────────────────────────────
+  // Id da cotação persistida. Em criação começa nulo e é preenchido no 1º salvamento.
+  const cotacaoIdRef = useRef<string | null>(editarId)
+  // Idem para o cliente: sem isso cada autosave criaria um cliente duplicado,
+  // porque persistir() cria um novo sempre que clienteId está nulo.
+  const clienteIdRef = useRef<string | null>(null)
+  // Em edição só liberamos o autosave depois que os dados terminaram de carregar,
+  // senão o formulário ainda vazio sobrescreveria a cotação existente.
+  const [pronto, setPronto] = useState(!editarId)
+  const [autoStatus, setAutoStatus] = useState<'idle' | 'salvando' | 'salvo' | 'erro'>('idle')
+  const [salvoEm, setSalvoEm] = useState<string | null>(null)
+  const ultimoSalvoRef = useRef<string | null>(null)
+  const emVooRef = useRef(false)
+
   // ── Estado: Etapa 1 — Cadastro ──────────────────────────────
   const [cnpj, setCnpj] = useState('')
   const [clienteId, setClienteId] = useState<string | null>(searchParams.get('cliente_id'))
@@ -243,7 +257,7 @@ export default function NovaCotacaoPage() {
   // ── Carrega dados ao editar cotação existente ────────────────
   useEffect(() => {
     if (!editarId) return
-    buscarCotacao(editarId).then(cotacao => {
+    const pCotacao = buscarCotacao(editarId).then(cotacao => {
       if (!cotacao) return
       const c = cotacao as Record<string, unknown>
       setCnpj(formatCNPJ((c.cnpj as string) ?? ''))
@@ -310,10 +324,10 @@ export default function NovaCotacaoPage() {
       setCondParticulares(txt(c.condicoes_particulares))
       setAssLocal(txt(c.assinatura_local))
       setAssData(txt(c.assinatura_data).slice(0, 10))
-    }).catch(console.error)
+    })
 
     // Tabelas filhas — sem isso, salvar uma edição apagaria todas elas
-    buscarTabelasFilhas(editarId).then(f => {
+    const pFilhas = buscarTabelasFilhas(editarId).then(f => {
       if (f.mercadorias.length) setMercadorias(f.mercadorias.map(r => {
         const m = r as Record<string, unknown>
         return { tipo: txt(m.tipo), embarcador: txt(m.embarcador), percentual: Number(m.percentual ?? 0) }
@@ -346,8 +360,60 @@ export default function NovaCotacaoPage() {
         const c3 = r as Record<string, unknown>
         return { lmg: txt(c3.lmg), ramo: txt(c3.ramo), taxa: txt(c3.taxa), pos_franquia: txt(c3.pos_franquia), premio_minimo: txt(c3.premio_minimo) }
       }))
-    }).catch(console.error)
+    })
+
+    // Só libera o autosave depois que as duas leituras terminarem
+    Promise.all([pCotacao, pFilhas]).catch(console.error).finally(() => setPronto(true))
   }, [editarId])
+
+  // ── Autosave ────────────────────────────────────────────────
+  // O snapshot é gatilho e detector de mudança ao mesmo tempo: se nada mudou
+  // desde a última gravação, nenhuma escrita chega ao banco. clienteId fica de
+  // fora por ser estado interno, não algo que o usuário preencheu.
+  const snapshot = JSON.stringify({
+    cnpj, dadosCadastro, ramosSel, embTN, embExp, embImp,
+    pctTerrestre, pctAereo, pctAquaviario, pctFerroviario, mercadorias, percursos,
+    avAtm, avNdd, avOutro, avContatoNome, avContatoEmail, avContatoTel, avEmailFatura,
+    qtdEmbarques, vlrMedio, vlrMaximo, vlrTotal, obsSazonalidade, detalhesOp,
+    pctFrota, pctTransp, pctAgregado, pctAutonomo,
+    expAnterior, condicaoAtual, sinPeriodo, sinistros, sinDetalhes,
+    gerenciadoras, rastrFornecedor, rastrTipo, gerencDetalhes, ddrs,
+    condPretendidas, condParticulares, assLocal, assData,
+  })
+  const snapshotRef = useRef(snapshot)
+  snapshotRef.current = snapshot
+
+  useEffect(() => {
+    if (!pronto || !corretora) return
+    // Sem razão social não há cotação que faça sentido criar
+    if (!dadosCadastro.razao_social.trim()) return
+    // Primeira passagem apenas registra a base de comparação
+    if (ultimoSalvoRef.current === null) { ultimoSalvoRef.current = snapshot; return }
+    if (ultimoSalvoRef.current === snapshot) return
+
+    const timer = setTimeout(async () => {
+      if (emVooRef.current) return
+      emVooRef.current = true
+      setAutoStatus('salvando')
+      try {
+        // O usuário pode seguir digitando durante a gravação; o laço garante
+        // que a versão mais recente também seja persistida.
+        while (snapshotRef.current !== ultimoSalvoRef.current) {
+          const alvo = snapshotRef.current
+          await persistir(false)
+          ultimoSalvoRef.current = alvo
+        }
+        setSalvoEm(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+        setAutoStatus('salvo')
+      } catch {
+        setAutoStatus('erro')
+      }
+      emVooRef.current = false
+    }, 2000)
+
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot, pronto, corretora])
 
   // ── Busca CNPJ ──────────────────────────────────────────────
   async function handleBuscarCNPJ() {
@@ -440,12 +506,14 @@ export default function NovaCotacaoPage() {
   }
 
   // ── Salvar tudo ─────────────────────────────────────────────
-  async function handleSalvar() {
+  // Usada pelo botão Salvar (redirecionar = true) e pelo autosave (false).
+  // No autosave o erro é propagado para o chamador marcar o status, em vez de alertar.
+  async function persistir(redirecionar: boolean) {
     if (!corretora) return
-    setSalvando(true)
+    if (redirecionar) setSalvando(true)
     try {
       // 1. Criar ou usar cliente existente
-      let cId = clienteId
+      let cId = clienteIdRef.current ?? clienteId
       if (!cId && dadosCadastro.razao_social) {
         const novoCliente = await criarCliente({
           corretora_id: corretora.id,
@@ -463,13 +531,17 @@ export default function NovaCotacaoPage() {
           contato_telefone: dadosCadastro.contato_telefone || undefined,
         })
         cId = novoCliente.id
+        clienteIdRef.current = cId
       }
 
       // 2. Criar OU atualizar cotação
+      // cotacaoIdRef guarda o id assim que a cotação existe — inclusive quando foi o
+      // próprio autosave que a criou durante o preenchimento de uma cotação nova.
       let coid: string
-      if (modoEdicao && editarId) {
-        // Modo edição — atualiza cotação existente
-        coid = editarId
+      const idExistente = cotacaoIdRef.current
+      if (idExistente) {
+        // Já existe — atualiza
+        coid = idExistente
         await atualizarCotacao(coid, {
           cnpj,
           razao_social: dadosCadastro.razao_social,
@@ -531,6 +603,7 @@ export default function NovaCotacaoPage() {
       })
 
       coid = (cotacao as Record<string, unknown>).id as string
+      cotacaoIdRef.current = coid
       } // fim else modo criação
 
       // 3. Atualizar campos extras (ramos múltiplos, averbação, sinistros, etc.)
@@ -575,13 +648,16 @@ export default function NovaCotacaoPage() {
           condPretendidas.filter(c => c.lmg || c.ramo).map(c => ({ ...c, premio_minimo: c.premio_minimo ? Number(c.premio_minimo) : null }))),
       ])
 
-      router.push(`/cotacoes/${coid}`)
+      if (redirecionar) router.push(`/cotacoes/${coid}`)
     } catch (e) {
       console.error(e)
+      if (!redirecionar) { setSalvando(false); throw e }
       alert('Erro ao salvar. Verifique os dados e tente novamente.')
     }
-    setSalvando(false)
+    if (redirecionar) setSalvando(false)
   }
+
+  const handleSalvar = () => persistir(true)
 
   // ── Navegação ────────────────────────────────────────────────
   const Nav = ({ back, next, isLast }: { back?: () => void; next?: () => void; isLast?: boolean }) => (
@@ -647,6 +723,16 @@ export default function NovaCotacaoPage() {
           <h1 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-1)" }}>{modoEdicao ? 'Editar cotação' : 'Nova cotação'}</h1>
           <p style={{ fontSize: 12, color: "var(--text-3)", marginTop: 2 }}>{modoEdicao ? 'Altere os dados e salve' : 'Preencha os dados do questionário'}</p>
         </div>
+        {autoStatus !== 'idle' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginLeft: 'auto',
+            color: autoStatus === 'erro' ? '#f85149' : autoStatus === 'salvando' ? 'var(--text-3)' : '#3fb950' }}>
+            <i className={`ti ${autoStatus === 'erro' ? 'ti-alert-circle' : autoStatus === 'salvando' ? 'ti-loader-2' : 'ti-cloud-check'}`}
+              style={{ fontSize: 14 }} aria-hidden="true" />
+            {autoStatus === 'salvando' ? 'Salvando…'
+              : autoStatus === 'erro' ? 'Falha ao salvar — use o botão Salvar'
+              : `Salvo${salvoEm ? ` às ${salvoEm}` : ''}`}
+          </div>
+        )}
       </div>
 
       <StepHeader etapa={etapa} total={ETAPAS.length} />
