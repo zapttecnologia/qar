@@ -167,7 +167,12 @@ export default function NovaCotacaoPage() {
   const { corretora } = useSessao()
   const cota = useCotacoes()
   const antt = useANTT()
-  const [etapa, setEtapa] = useState(1)
+  // ?etapa=N abre direto na seção correspondente — usado pelos lápis de
+  // "Editar" de cada seção da tela de detalhe da cotação.
+  const etapaInicial = Number(searchParams.get('etapa'))
+  const [etapa, setEtapa] = useState(
+    Number.isInteger(etapaInicial) && etapaInicial >= 1 && etapaInicial <= ETAPAS.length ? etapaInicial : 1
+  )
   const [salvando, setSalvando] = useState(false)
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false)
   const [cnpjStatus, setCnpjStatus] = useState<'idle' | 'ok' | 'error'>('idle')
